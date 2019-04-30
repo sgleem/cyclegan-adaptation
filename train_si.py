@@ -58,7 +58,7 @@ lm.alloc_stat_type_list(["train_loss","train_acc","dev_loss","dev_acc"])
 # preprocess
 for dataset in [train_feat, dev_feat]:
     for utt_id, feat_mat in dataset.items():
-        #feat_mat = matrix_normalize(feat_mat, axis=1, fcn_type="mean")
+        feat_mat = matrix_normalize(feat_mat, axis=0, fcn_type="mean")
         feat_mat = torch.Tensor(feat_mat).cuda().float()
         dataset[utt_id] = feat_mat
 
