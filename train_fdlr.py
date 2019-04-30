@@ -16,7 +16,7 @@ from tool.kaldi.kaldi_manager import read_feat
 parser = argparse.ArgumentParser()
 parser.add_argument("--adapt_dir", default="data/ntimit/adapt", type=str)
 parser.add_argument("--dev_dir", default="data/ntimit/dev", type=str)
-parser.add_argument("--si_dir", default="model/gru_norm", type=str)
+parser.add_argument("--si_dir", default="model/gru", type=str)
 parser.add_argument("--sa_dir", default="model/fdlr", type=str)
 parser.add_argument("--rank", default=0, type=int)
 parser.add_argument("--size", default=1, type=int)
@@ -42,7 +42,7 @@ dev_utt = list(dev_feat.keys())
 
 for dataset in [adapt_feat, dev_feat]:
     for utt_id, feat_mat in dataset.items():
-        feat_mat = matrix_normalize(feat_mat, axis=1, fcn_type="mean")
+        # feat_mat = matrix_normalize(feat_mat, axis=1, fcn_type="mean")
         feat_mat = torch.Tensor(feat_mat).cuda().float()
         dataset[utt_id] = feat_mat
 

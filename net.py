@@ -27,9 +27,9 @@ class FDLR(nn.Module):
         super(FDLR, self).__init__()
         feat_dim = kwargs.get("feat_dim", 120)
         hidden_dim = kwargs.get("hidden_dim", 512)
-        num_layers = kwargs.get("num_layers", 1)
+        num_layers = kwargs.get("num_layers", 2)
 
-        self.GRU = nn.GRU(input_size = feat_dim, hidden_size = hidden_dim, num_layers=num_layers)
+        self.GRU = nn.GRU(input_size = feat_dim, hidden_size = hidden_dim, num_layers=num_layers, dropout=0.2)
         self.out = nn.Sequential(
             nn.Linear(hidden_dim, int(hidden_dim/2)),
             nn.PReLU(),
