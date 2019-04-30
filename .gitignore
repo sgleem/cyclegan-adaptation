@@ -1,0 +1,6 @@
+data/*
+ali/*
+model/*
+*.pyc
+*.txt
+*.zip
