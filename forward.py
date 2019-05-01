@@ -42,13 +42,15 @@ if sa_dir is not "":
     model_sa.cuda()
     model_sa.eval()
 
+print(model_sa)
+
 kaldi_fp = kio.open_or_fd(si_dir+"/decode/lld.ark", 'wb')
 with torch.no_grad():
     for utt_id, feat_mat in test_feat.items():
         feat_mat = matrix_normalize(feat_mat, axis=1, fcn_type="mean")
-        x = torch.Tensor(feat_mat).cuda().float()
+        x = torch.Tensor([feat_mat]).cuda().float()
         if sa_dir is not "":
-            x = model_sa(x)
+            x = model_sa(x)[0]
         y = dnn_am(x)
 
         post_prob = y.cpu().numpy()
