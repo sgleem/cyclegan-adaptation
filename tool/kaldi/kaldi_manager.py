@@ -1,22 +1,8 @@
 #!/usr/bin/env python3
 #coding=utf8
 
-"""
-To Do)
-    * Split kaldi command factory
-
-Input)
-
-Output)
-
-Requirements)
-
-Role)
-
-Process)
-"""
 import numpy as np
-import kaldi_io
+from . import kaldi_io
 from . import kaldi_command as kc
 
 class KaldiReadManager:
