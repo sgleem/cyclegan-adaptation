@@ -83,7 +83,7 @@ for model in [Gn2c, Gc2n, Dc, Dn]:
     model.cuda()
 
 lm = LogManager()
-for stype in ["D_adv", "D_adv_true", "D_adv_false", "G_adv", "cyc", "id"]:
+for stype in ["D_adv", "G_adv", "cyc", "id"]:
     lm.alloc_stat_type(stype)
 
 # noise_uttset = list(adapt_storage.keys())
@@ -132,8 +132,6 @@ for epoch in range(epochs):
 
         # Save to Log
         lm.add_torch_stat("D_adv", adv)
-        lm.add_torch_stat("D_adv_true", adv1)
-        lm.add_torch_stat("D_adv_false", adv2)
     # G phase
     # for noise_utt, clean_utt in zip(noise_uttset, clean_uttset):
         # n = adapt_storage[noise_utt]
@@ -188,19 +186,19 @@ for epoch in range(epochs):
         # Accumulate adv, cyc, id loss
         # for dev_utt in dev_uttset:
         #     n = dev_storage[dev_utt]
-        # for dev_utt in dev_loader:
-        for dev_utt, clean_utt in zip(dev_loader, clean_loader):
+        for dev_utt in dev_loader:
+        # for dev_utt, clean_utt in zip(dev_loader, clean_loader):
             n = dev_utt.cuda().float()
-            c = clean_utt.cuda().float()
+            #c = clean_utt.cuda().float()
 
             n2c = Gn2c(n)
             # Adversarial stat
-            clean_true = Dc(c)
+            # clean_true = Dc(c)
             clean_false = Dc(n2c)
 
-            adv1 = l2loss(clean_true, 1) / 2
-            adv2 = l2loss(clean_false, 0) / 2 
-            D_adv = adv_coef * (adv1 + adv2)
+            #adv1 = l2loss(clean_true, 1) / 2
+            #adv2 = l2loss(clean_false, 0) / 2 
+            D_adv = adv_coef * l2loss(clean_false, 0)
             G_adv = adv_coef * l2loss(clean_false, 1)
 
             # Cycle consistent stat
@@ -214,8 +212,6 @@ for epoch in range(epochs):
 
             # Save to Log
             lm.add_torch_stat("D_adv", D_adv)
-            lm.add_torch_stat("D_adv_true", adv1)
-            lm.add_torch_stat("D_adv_false", adv2)
             lm.add_torch_stat("G_adv", G_adv)
             lm.add_torch_stat("cyc", cyc)
             if id_coef > 0.0:

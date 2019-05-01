@@ -99,37 +99,31 @@ class Generator_CNN(nn.Module):
         self.downsample = nn.Sequential(
             ConvSample(inC=feat_dim, outC=128, k=5, s=1, p=2),
             ConvSample(inC=128, outC=256, k=5, s=1, p=2),
+            ConvSample(inC=256, outC=512, k=5, s=1, p=2)
             # nn.Dropout(0.2)
         )
         self.res = nn.Sequential(
-            Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
-            Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
-            Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
-            Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
-            Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
-            Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
+            Residual(inC=512, hiddenC=1024, k=3, s=1, p=1),
+            Residual(inC=512, hiddenC=1024, k=3, s=1, p=1),
+            Residual(inC=512, hiddenC=1024, k=3, s=1, p=1),
+            Residual(inC=512, hiddenC=1024, k=3, s=1, p=1),
+            Residual(inC=512, hiddenC=1024, k=3, s=1, p=1),
+            Residual(inC=512, hiddenC=1024, k=3, s=1, p=1),
             # nn.Dropout(0.2)
         )
         self.upsample = nn.Sequential(
-            ConvSample(inC=256, outC=128, k=5, s=1, p=2),
-            ConvSample(inC=128, outC=feat_dim, k=5, s=1, p=2),
+            ConvSample(inC=512, outC=256, k=5, s=1, p=2),
+            ConvSample(inC=256, outC=feat_dim, k=5, s=1, p=2),
             # nn.Dropout(0.2)
         )
         self.out = nn.Linear(feat_dim, feat_dim)
 
     def forward(self, x):
-        decode = True if x.dim()==2 else False
-        if decode:
-            x = x.permute(1, 0)
-        else:
-            x = x.permute(0, 2, 1)
+        x = x.permute(0, 2, 1)
         h1 = self.downsample(x)
         h2 = self.res(h1)
         h3 = self.upsample(h2)
-        if decode:
-            h3 = h3.permute(1, 0)
-        else:
-            h3 = h3.permute(0, 2, 1)
+        h3 = h3.permute(0, 2, 1)
         out = self.out(h3)
         
         return out
@@ -141,6 +135,7 @@ class Discriminator_CNN(nn.Module):
         hidden_dim = kwargs.get("hidden_dim", 512)
         self.out = nn.Sequential(
             nn.Linear(feat_dim, hidden_dim), nn.PReLU(),
+            nn.Linear(hidden_dim, hidden_dim), nn.PReLU(),
             nn.Linear(hidden_dim, 1)
         )
 
