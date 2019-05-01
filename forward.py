@@ -6,7 +6,7 @@ import numpy as np
 
 from net import *
 from module import *
-from preprocess import matrix_normalize
+from data_preprocess import matrix_normalize
 from tool.kaldi import kaldi_io as kio
 from tool.kaldi.kaldi_manager import read_feat
 #####################################################################

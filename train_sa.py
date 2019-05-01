@@ -66,8 +66,8 @@ clean_loader = DataLoader(clean_set, batch_size=batch_size)
 
 Gn2c = net.Generator_CNN(feat_dim=120, num_down=2, num_res=6, num_up=2)
 Gc2n = net.Generator_CNN(feat_dim=120, num_down=2, num_res=6, num_up=2)
-Dc = net.Discriminator(feat_dim=120, num_down=3)
-Dn = net.Discriminator(feat_dim=120, num_down=3)
+Dc = net.Discriminator_CNN(feat_dim=120, num_down=3)
+Dn = net.Discriminator_CNN(feat_dim=120, num_down=3)
 
 Gn2c_opt = optim.Adam(Gn2c.parameters(), lr=lr_g)
 Gc2n_opt = optim.Adam(Gc2n.parameters(), lr=lr_g)
