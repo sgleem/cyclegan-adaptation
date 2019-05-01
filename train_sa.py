@@ -30,7 +30,7 @@ clean_dir = args.clean_dir
 model_dir = args.model_dir
 #####################################################################
 epochs = 1000
-batch_size = 16
+batch_size = 1
 lr_g = 0.0002
 lr_d = 0.0001
 
@@ -48,7 +48,6 @@ clean_storage = read_feat(clean_dir+"/feats.ark", delta=True)
 for dataset in [adapt_storage, dev_storage, clean_storage]:
     for utt_id, feat_mat in dataset.items():
         feat_mat = pp.matrix_normalize(feat_mat, axis=1, fcn_type="mean")
-        # feat_mat = torch.Tensor(feat_mat).cuda().float()
         dataset[utt_id] = feat_mat
 
 adapt_set = pp.make_cnn_dataset(adapt_storage, input_size=128); print(len(adapt_set))
@@ -58,11 +57,6 @@ clean_set = pp.make_cnn_dataset(clean_storage, input_size=128); print(len(clean_
 adapt_loader = DataLoader(adapt_set, batch_size=batch_size, shuffle=True)
 dev_loader = DataLoader(dev_set, batch_size=batch_size, shuffle=True)
 clean_loader = DataLoader(clean_set, batch_size=batch_size)
-
-# Gn2c = net.Generator(feat_dim=120, hidden_dim=512, num_layers=3)
-# Gc2n = net.Generator(feat_dim=120, hidden_dim=512, num_layers=3)
-# Dc = net.Discriminator(feat_dim=120, hidden_dim=512)
-# Dn = net.Discriminator(feat_dim=120, hidden_dim=512)
 
 Gn2c = net.Generator_CNN(feat_dim=120, num_down=2, num_res=6, num_up=2)
 Gc2n = net.Generator_CNN(feat_dim=120, num_down=2, num_res=6, num_up=2)
@@ -86,10 +80,6 @@ lm = LogManager()
 for stype in ["D_adv", "G_adv", "cyc", "id"]:
     lm.alloc_stat_type(stype)
 
-# noise_uttset = list(adapt_storage.keys())
-# dev_uttset = list(dev_storage.keys())
-# clean_uttset = list(clean_storage.keys())
-
 torch.save(Gn2c, model_dir+"/init.pt")
 
 for epoch in range(epochs):
@@ -103,11 +93,7 @@ for epoch in range(epochs):
     lm.init_stat()
     for model in [Gn2c, Gc2n, Dc, Dn]:
         model.train()
-    # shuffle(noise_uttset); shuffle(clean_uttset)
     # D & SPK phase
-    # for noise_utt, clean_utt in zip(noise_uttset, clean_uttset):
-        # n = adapt_storage[noise_utt]
-        # c = clean_storage[clean_utt]
     for noise_utt, clean_utt in zip(adapt_loader, clean_loader):
         n = noise_utt.cuda().float()
         c = clean_utt.cuda().float()
@@ -133,9 +119,6 @@ for epoch in range(epochs):
         # Save to Log
         lm.add_torch_stat("D_adv", adv)
     # G phase
-    # for noise_utt, clean_utt in zip(noise_uttset, clean_uttset):
-        # n = adapt_storage[noise_utt]
-        # c = clean_storage[clean_utt]
     for noise_utt, clean_utt in zip(adapt_loader, clean_loader):
         n = noise_utt.cuda().float()
         c = clean_utt.cuda().float()
@@ -184,20 +167,13 @@ for epoch in range(epochs):
         model.eval()
     with torch.no_grad():
         # Accumulate adv, cyc, id loss
-        # for dev_utt in dev_uttset:
-        #     n = dev_storage[dev_utt]
         for dev_utt in dev_loader:
-        # for dev_utt, clean_utt in zip(dev_loader, clean_loader):
             n = dev_utt.cuda().float()
-            #c = clean_utt.cuda().float()
 
             n2c = Gn2c(n)
             # Adversarial stat
-            # clean_true = Dc(c)
             clean_false = Dc(n2c)
 
-            #adv1 = l2loss(clean_true, 1) / 2
-            #adv2 = l2loss(clean_false, 0) / 2 
             D_adv = adv_coef * l2loss(clean_false, 0)
             G_adv = adv_coef * l2loss(clean_false, 1)
 
