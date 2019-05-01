@@ -115,18 +115,25 @@ class Generator_CNN(nn.Module):
         self.out = nn.Linear(feat_dim, feat_dim)
 
     def forward(self, x):
-        x = x.permute(0, 2, 1)
+        decode = True if x.dim()==2 else False
+        if decode:
+            x = x.permute(1, 0)
+        else:
+            x = x.permute(0, 2, 1)
         h1 = self.downsample(x)
         h2 = self.res(h1)
         h3 = self.upsample(h2)
-        h3 = h3.permute(0, 2, 1)
+        if decode:
+            h3 = h3.permute(1, 0)
+        else:
+            h3 = h3.permute(0, 2, 1)
         out = self.out(h3)
         
         return out
 
 class Discriminator_CNN(nn.Module):
     def __init__(self, *args, **kwargs):
-        super(Generator_CNN, self).__init__()
+        super(Discriminator_CNN, self).__init__()
         feat_dim = kwargs.get("feat_dim", 120)
         num_down = kwargs.get("num_down", 3)
 
