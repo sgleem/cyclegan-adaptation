@@ -142,7 +142,7 @@ class Discriminator_CNN(nn.Module):
             ConvSample(inC=128, outC=256, k=5, s=1, p=2),
             ConvSample(inC=256, outC=512, k=3, s=1, p=1),
         )
-        self.out = nn.Linear(feat_dim, 1)
+        self.out = nn.Linear(512, 1)
 
     def forward(self, x):
         x = x.permute(0, 2, 1)
