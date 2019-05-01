@@ -4,6 +4,8 @@ import torch
 import pickle as pk
 import numpy as np
 
+from net import *
+from module import *
 from preprocess import matrix_normalize
 from tool.kaldi import kaldi_io as kio
 from tool.kaldi.kaldi_manager import read_feat
@@ -43,7 +45,7 @@ if sa_dir is not "":
 kaldi_fp = kio.open_or_fd(si_dir+"/decode/lld.ark", 'wb')
 with torch.no_grad():
     for utt_id, feat_mat in test_feat.items():
-        # feat_mat = matrix_normalize(feat_mat, axis=1, fcn_type="mean")
+        feat_mat = matrix_normalize(feat_mat, axis=1, fcn_type="mean")
         x = torch.Tensor(feat_mat).cuda().float()
         if sa_dir is not "":
             x = model_sa(x)
