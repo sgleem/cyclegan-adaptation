@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from module import ConvSample, Residual
+from module import ConvSample, Residual, ConvSample2D
 
 class GRU_HMM(nn.Module):
     def __init__(self, *args, **kwargs):
@@ -98,7 +98,8 @@ class Generator_CNN(nn.Module):
 
         self.downsample = nn.Sequential(
             ConvSample(inC=feat_dim, outC=128, k=5, s=1, p=2),
-            ConvSample(inC=128, outC=256, k=5, s=1, p=2)
+            ConvSample(inC=128, outC=256, k=5, s=1, p=2),
+            # nn.Dropout(0.2)
         )
         self.res = nn.Sequential(
             Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
@@ -106,11 +107,13 @@ class Generator_CNN(nn.Module):
             Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
             Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
             Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
-            Residual(inC=256, hiddenC=512, k=3, s=1, p=1)
+            Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
+            # nn.Dropout(0.2)
         )
         self.upsample = nn.Sequential(
             ConvSample(inC=256, outC=128, k=5, s=1, p=2),
-            ConvSample(inC=128, outC=feat_dim, k=5, s=1, p=2)
+            ConvSample(inC=128, outC=feat_dim, k=5, s=1, p=2),
+            # nn.Dropout(0.2)
         )
         self.out = nn.Linear(feat_dim, feat_dim)
 
@@ -131,3 +134,18 @@ class Generator_CNN(nn.Module):
         
         return out
 
+class Discriminator_CNN(nn.Module):
+    def __init__(self, *args, **kwargs):
+        super(Discriminator_CNN, self).__init__()
+        feat_dim = kwargs.get("feat_dim", 120)
+        hidden_dim = kwargs.get("hidden_dim", 512)
+        self.out = nn.Sequential(
+            nn.Linear(feat_dim, hidden_dim), nn.PReLU(),
+            nn.Linear(hidden_dim, 1)
+        )
+
+    def forward(self, x):
+        out = self.out(x)
+        out = torch.sigmoid(out)
+        
+        return out
