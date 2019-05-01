@@ -98,7 +98,8 @@ class Generator_CNN(nn.Module):
 
         self.downsample = nn.Sequential(
             ConvSample(inC=feat_dim, outC=128, k=5, s=1, p=2),
-            ConvSample(inC=128, outC=256, k=5, s=1, p=2)
+            ConvSample(inC=128, outC=256, k=5, s=1, p=2),
+            # nn.Dropout(0.2)
         )
         self.res = nn.Sequential(
             Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
@@ -106,11 +107,13 @@ class Generator_CNN(nn.Module):
             Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
             Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
             Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
-            Residual(inC=256, hiddenC=512, k=3, s=1, p=1)
+            Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
+            # nn.Dropout(0.2)
         )
         self.upsample = nn.Sequential(
             ConvSample(inC=256, outC=128, k=5, s=1, p=2),
-            ConvSample(inC=128, outC=feat_dim, k=5, s=1, p=2)
+            ConvSample(inC=128, outC=feat_dim, k=5, s=1, p=2),
+            # nn.Dropout(0.2)
         )
         self.out = nn.Linear(feat_dim, feat_dim)
 
@@ -134,25 +137,15 @@ class Generator_CNN(nn.Module):
 class Discriminator_CNN(nn.Module):
     def __init__(self, *args, **kwargs):
         super(Discriminator_CNN, self).__init__()
-        self.feat_dim = kwargs.get("feat_dim", 120)
-        num_down = kwargs.get("num_down", 3)
-
-        self.downsample = nn.Sequential(
-            ConvSample2D(inC=1, outC=8, k=3, s=1, p=1),
-            ConvSample2D(inC=8, outC=64, k=5, s=1, p=2),
-            ConvSample2D(inC=64, outC=512, k=7, s=1, p=3),
-            ConvSample2D(inC=512, outC=64, k=5, s=1, p=2),
-            ConvSample2D(inC=64, outC=8, k=3, s=1, p=1),
+        feat_dim = kwargs.get("feat_dim", 120)
+        hidden_dim = kwargs.get("hidden_dim", 512)
+        self.out = nn.Sequential(
+            nn.Linear(feat_dim, hidden_dim), nn.PReLU(),
+            nn.Linear(hidden_dim, 1)
         )
-        self.out = nn.Linear(8 * self.feat_dim, 1)
 
     def forward(self, x):
-        x = torch.unsqueeze(x, dim=1)
-        h = self.downsample(x)
-        # (N, 8, frame, feat) -> (N, frame, 8, feat) -> (N, frame, 8*feat)
-        h = h.permute(0, 2, 1, 3)
-        h = torch.flatten(h, start_dim=2)
-        out = self.out(h)
+        out = self.out(x)
         out = torch.sigmoid(out)
         
         return out

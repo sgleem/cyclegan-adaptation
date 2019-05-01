@@ -66,8 +66,8 @@ clean_loader = DataLoader(clean_set, batch_size=batch_size)
 
 Gn2c = net.Generator_CNN(feat_dim=120, num_down=2, num_res=6, num_up=2)
 Gc2n = net.Generator_CNN(feat_dim=120, num_down=2, num_res=6, num_up=2)
-Dc = net.Discriminator_CNN(feat_dim=120, num_down=3)
-Dn = net.Discriminator_CNN(feat_dim=120, num_down=3)
+Dc = net.Discriminator_CNN(feat_dim=120, hidden_dim=512)
+Dn = net.Discriminator_CNN(feat_dim=120, hidden_dim=512)
 
 Gn2c_opt = optim.Adam(Gn2c.parameters(), lr=lr_g)
 Gc2n_opt = optim.Adam(Gc2n.parameters(), lr=lr_g)
@@ -83,7 +83,7 @@ for model in [Gn2c, Gc2n, Dc, Dn]:
     model.cuda()
 
 lm = LogManager()
-for stype in ["D_adv", "G_adv", "cyc", "id"]:
+for stype in ["D_adv", "D_adv_true", "D_adv_false", "G_adv", "cyc", "id"]:
     lm.alloc_stat_type(stype)
 
 # noise_uttset = list(adapt_storage.keys())
@@ -118,8 +118,8 @@ for epoch in range(epochs):
         clean_true = Dc(c); clean_false = Dc(n2c)
         noise_true = Dn(n); noise_false = Dn(c2n)
 
-        adv1 = l2loss(clean_true, 1) / 2 + l2loss(clean_false, 0) / 2
-        adv2 = l2loss(noise_true, 1) / 2 + l2loss(noise_false, 0) / 2
+        adv1 = l2loss(clean_true, 1) / 2 + l2loss(noise_true, 1) / 2
+        adv2 = l2loss(clean_false, 0) / 2 + l2loss(noise_false, 0) / 2
         adv = adv_coef * (adv1 + adv2)
 
         # Update Parameter
@@ -132,6 +132,8 @@ for epoch in range(epochs):
 
         # Save to Log
         lm.add_torch_stat("D_adv", adv)
+        lm.add_torch_stat("D_adv_true", adv1)
+        lm.add_torch_stat("D_adv_false", adv2)
     # G phase
     # for noise_utt, clean_utt in zip(noise_uttset, clean_uttset):
         # n = adapt_storage[noise_utt]
@@ -186,14 +188,19 @@ for epoch in range(epochs):
         # Accumulate adv, cyc, id loss
         # for dev_utt in dev_uttset:
         #     n = dev_storage[dev_utt]
-        for dev_utt in dev_loader:
+        # for dev_utt in dev_loader:
+        for dev_utt, clean_utt in zip(dev_loader, clean_loader):
             n = dev_utt.cuda().float()
+            c = clean_utt.cuda().float()
 
             n2c = Gn2c(n)
             # Adversarial stat
+            clean_true = Dc(c)
             clean_false = Dc(n2c)
 
-            D_adv = adv_coef * l2loss(clean_false, 0)
+            adv1 = l2loss(clean_true, 1) / 2
+            adv2 = l2loss(clean_false, 0) / 2 
+            D_adv = adv_coef * (adv1 + adv2)
             G_adv = adv_coef * l2loss(clean_false, 1)
 
             # Cycle consistent stat
@@ -207,6 +214,8 @@ for epoch in range(epochs):
 
             # Save to Log
             lm.add_torch_stat("D_adv", D_adv)
+            lm.add_torch_stat("D_adv_true", adv1)
+            lm.add_torch_stat("D_adv_false", adv2)
             lm.add_torch_stat("G_adv", G_adv)
             lm.add_torch_stat("cyc", cyc)
             if id_coef > 0.0:
