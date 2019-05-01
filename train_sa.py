@@ -30,7 +30,7 @@ clean_dir = args.clean_dir
 model_dir = args.model_dir
 #####################################################################
 epochs = 1000
-batch_size = 16
+batch_size = 1
 lr_g = 0.0002
 lr_d = 0.0001
 
