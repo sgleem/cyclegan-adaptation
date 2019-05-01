@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from module import ConvSample, Residual
+from module import ConvSample, Residual, ConvSample2D
 
 class GRU_HMM(nn.Module):
     def __init__(self, *args, **kwargs):
@@ -134,20 +134,24 @@ class Generator_CNN(nn.Module):
 class Discriminator_CNN(nn.Module):
     def __init__(self, *args, **kwargs):
         super(Discriminator_CNN, self).__init__()
-        feat_dim = kwargs.get("feat_dim", 120)
+        self.feat_dim = kwargs.get("feat_dim", 120)
         num_down = kwargs.get("num_down", 3)
 
         self.downsample = nn.Sequential(
-            ConvSample(inC=feat_dim, outC=128, k=7, s=1, p=3),
-            ConvSample(inC=128, outC=256, k=5, s=1, p=2),
-            ConvSample(inC=256, outC=512, k=3, s=1, p=1),
+            ConvSample2D(inC=1, outC=8, k=3, s=1, p=1),
+            ConvSample2D(inC=8, outC=64, k=5, s=1, p=2),
+            ConvSample2D(inC=64, outC=512, k=7, s=1, p=3),
+            ConvSample2D(inC=512, outC=64, k=5, s=1, p=2),
+            ConvSample2D(inC=64, outC=8, k=3, s=1, p=1),
         )
-        self.out = nn.Linear(512, 1)
+        self.out = nn.Linear(8 * self.feat_dim, 1)
 
     def forward(self, x):
-        x = x.permute(0, 2, 1)
+        x = torch.unsqueeze(x, dim=1)
         h = self.downsample(x)
-        h = h.permute(0, 2, 1)
+        # (N, 8, frame, feat) -> (N, frame, 8, feat) -> (N, frame, 8*feat)
+        h = h.permute(0, 2, 1, 3)
+        h = torch.flatten(h, start_dim=2)
         out = self.out(h)
         out = torch.sigmoid(out)
         
