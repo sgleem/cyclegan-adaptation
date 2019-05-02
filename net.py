@@ -53,19 +53,19 @@ class Generator(nn.Module):
         hidden_dim = kwargs.get("hidden_dim", 512)
         num_layers = kwargs.get("num_layers", 2)
 
-        self.GRU = nn.GRU(input_size = feat_dim, hidden_size = hidden_dim, num_layers=num_layers, dropout=0.2)
-        self.out = nn.Sequential(
-            nn.Linear(hidden_dim, int(hidden_dim/2)),
-            nn.PReLU(),
-            nn.Linear(int(hidden_dim/2), feat_dim)
+        self.MLP = nn.Sequential(
+            nn.Linear(feat_dim, hidden_dim), nn.PReLU(), nn.BatchNorm1d(hidden_dim), nn.Dropout(0.2),
+            nn.Linear(hidden_dim, hidden_dim), nn.PReLU(), nn.BatchNorm1d(hidden_dim), nn.Dropout(0.2),
+            nn.Linear(hidden_dim, hidden_dim), nn.PReLU(), nn.BatchNorm1d(hidden_dim), nn.Dropout(0.2),
+            nn.Linear(hidden_dim, hidden_dim), nn.PReLU(), nn.BatchNorm1d(hidden_dim), nn.Dropout(0.2),
+            nn.Linear(hidden_dim, hidden_dim), nn.PReLU(), nn.BatchNorm1d(hidden_dim), nn.Dropout(0.2),
+            nn.Linear(hidden_dim, feat_dim)
         )
 
     def forward(self, x):
-        x = torch.unsqueeze(x, dim=1)
-        h, _ = self.GRU(x)
-        h = torch.squeeze(h, dim=1)
-        x_ = self.out(h)
-        return x_
+        x = torch.squeeze(x)
+        h = self.MLP(x)
+        return h
 
 class Discriminator(nn.Module):
     def __init__(self, *args, **kwargs):
@@ -73,20 +73,18 @@ class Discriminator(nn.Module):
         feat_dim = kwargs.get("feat_dim", 120)
         hidden_dim = kwargs.get("hidden_dim", 512)
 
-        self.MLP = nn.Sequential(
-            nn.Linear(feat_dim, hidden_dim),
-            nn.PReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.PReLU()
-        )
         self.out = nn.Sequential(
-            nn.Linear(hidden_dim, 1),
-            nn.Sigmoid()
+            nn.Linear(feat_dim, hidden_dim), nn.PReLU(),
+            nn.Linear(hidden_dim, hidden_dim), nn.PReLU(),
+            nn.Linear(hidden_dim, hidden_dim), nn.PReLU(),
+            nn.Linear(hidden_dim, 1)
         )
+
     def forward(self, x):
-        h = self.MLP(x)
-        prob = self.out(h)
-        return prob
+        out = self.out(x)
+        out = torch.sigmoid(out)
+        
+        return out
 
 class Generator_CNN(nn.Module):
     def __init__(self, *args, **kwargs):
@@ -98,23 +96,17 @@ class Generator_CNN(nn.Module):
 
         self.downsample = nn.Sequential(
             ConvSample(inC=feat_dim, outC=128, k=5, s=1, p=2),
-            ConvSample(inC=128, outC=256, k=5, s=1, p=2),
-            ConvSample(inC=256, outC=512, k=5, s=1, p=2)
-            # nn.Dropout(0.2)
+            ConvSample(inC=128, outC=256, k=5, s=1, p=2)
         )
         self.res = nn.Sequential(
-            Residual(inC=512, hiddenC=1024, k=3, s=1, p=1),
-            Residual(inC=512, hiddenC=1024, k=3, s=1, p=1),
-            Residual(inC=512, hiddenC=1024, k=3, s=1, p=1),
-            Residual(inC=512, hiddenC=1024, k=3, s=1, p=1),
-            Residual(inC=512, hiddenC=1024, k=3, s=1, p=1),
-            Residual(inC=512, hiddenC=1024, k=3, s=1, p=1),
-            # nn.Dropout(0.2)
+            Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
+            Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
+            Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
+            Residual(inC=256, hiddenC=512, k=3, s=1, p=1)
         )
         self.upsample = nn.Sequential(
-            ConvSample(inC=512, outC=256, k=5, s=1, p=2),
-            ConvSample(inC=256, outC=feat_dim, k=5, s=1, p=2),
-            # nn.Dropout(0.2)
+            ConvSample(inC=256, outC=128, k=5, s=1, p=2),
+            ConvSample(inC=128, outC=feat_dim, k=5, s=1, p=2),
         )
         self.out = nn.Linear(feat_dim, feat_dim)
 
@@ -133,14 +125,20 @@ class Discriminator_CNN(nn.Module):
         super(Discriminator_CNN, self).__init__()
         feat_dim = kwargs.get("feat_dim", 120)
         hidden_dim = kwargs.get("hidden_dim", 512)
+        self.downsample = nn.Sequential(
+            ConvSample(inC=feat_dim, outC=128, k=5, s=1, p=2),
+            ConvSample(inC=128, outC=256, k=5, s=1, p=2)
+        )
         self.out = nn.Sequential(
-            nn.Linear(feat_dim, hidden_dim), nn.PReLU(),
-            nn.Linear(hidden_dim, hidden_dim), nn.PReLU(),
+            nn.Linear(256, hidden_dim), nn.LeakyReLU(),
             nn.Linear(hidden_dim, 1)
         )
 
     def forward(self, x):
-        out = self.out(x)
+        x = x.permute(0, 2, 1)
+        h = self.downsample(x)
+        h = h.permute(0, 2, 1)
+        out = self.out(h)
         out = torch.sigmoid(out)
         
         return out
