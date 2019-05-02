@@ -30,9 +30,9 @@ clean_dir = args.clean_dir
 model_dir = args.model_dir
 #####################################################################
 epochs = 1000
-batch_size = 1
-lr_g = 0.0002
-lr_d = 0.0001
+batch_size = 64
+lr_g = 0.00002
+lr_d = 0.00001
 
 change_epoch = 200
 save_per_epoch = 5
@@ -55,8 +55,17 @@ dev_set = pp.make_cnn_dataset(dev_storage, input_size=128); print(len(dev_set))
 clean_set = pp.make_cnn_dataset(clean_storage, input_size=128); print(len(clean_set))
 
 adapt_loader = DataLoader(adapt_set, batch_size=batch_size, shuffle=True)
-dev_loader = DataLoader(dev_set, batch_size=batch_size, shuffle=True)
-clean_loader = DataLoader(clean_set, batch_size=batch_size)
+dev_loader = DataLoader(dev_set, batch_size=batch_size)
+clean_loader = DataLoader(clean_set, batch_size=batch_size, shuffle=True)
+
+print(len(adapt_loader))
+print(len(dev_loader))
+print(len(clean_loader))
+
+# Gn2c = net.Generator_CNN(feat_dim=120)
+# Gc2n = net.Generator_CNN(feat_dim=120)
+# Dc = net.Discriminator(feat_dim=120, hidden_dim=512)
+# Dn = net.Discriminator(feat_dim=120, hidden_dim=512)
 
 Gn2c = net.Generator_CNN(feat_dim=120, num_down=2, num_res=6, num_up=2)
 Gc2n = net.Generator_CNN(feat_dim=120, num_down=2, num_res=6, num_up=2)

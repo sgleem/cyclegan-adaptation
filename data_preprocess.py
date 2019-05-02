@@ -70,8 +70,7 @@ def matrix_normalize(origin_mat, axis=None, fcn_type="mean"):
 def make_cnn_dataset(utt_dict, input_size=128):
     segment_set = []
     for frame_mat in utt_dict.values():
-        segment_set.append(frame_mat)
-        """
+    
         frame_len = len(frame_mat)
         if frame_len < input_size:
             continue
@@ -79,6 +78,5 @@ def make_cnn_dataset(utt_dict, input_size=128):
         for start_idx in range(0, frame_len-input_size+1, input_size//4):
             segment = frame_mat[start_idx:start_idx+input_size]
             segment_set.append(segment)
-        """
     return segment_set
 
