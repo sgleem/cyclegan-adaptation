@@ -31,18 +31,12 @@ class FDLR(nn.Module):
         hidden_dim = kwargs.get("hidden_dim", 512)
         num_layers = kwargs.get("num_layers", 2)
 
-        self.GRU = nn.GRU(input_size = feat_dim, hidden_size = hidden_dim, num_layers=num_layers, dropout=0.2)
-        self.out = nn.Sequential(
-            nn.Linear(hidden_dim, int(hidden_dim/2)),
-            nn.PReLU(),
-            nn.Linear(int(hidden_dim/2), feat_dim)
-        )
+        self.MLP = nn.Linear(feat_dim, feat_dim)
+        self.MLP.weight = torch.nn.Parameter(torch.eye(feat_dim))
+        self.MLP.bias = torch.nn.Parameter(torch.zeros(feat_dim))
 
     def forward(self, x):
-        x = torch.unsqueeze(x, dim=1)
-        h, _ = self.GRU(x)
-        h = torch.squeeze(h, dim=1)
-        x_ = self.out(h)
+        x_ = self.MLP(x)
 
         return x_
 

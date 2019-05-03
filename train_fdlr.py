@@ -7,10 +7,12 @@ import torch
 import torch.optim as optim
 import torch.optim.lr_scheduler as scheduler
 
+from torch.utils.data import DataLoader
+
 import net
+import data_preprocess as pp
 from tool.log import LogManager
 from tool.loss import nllloss, calc_err
-from preprocess import matrix_normalize
 from tool.kaldi.kaldi_manager import read_feat
 #####################################################################
 parser = argparse.ArgumentParser()
@@ -28,7 +30,7 @@ si_dir = args.si_dir
 sa_dir = args.sa_dir
 #####################################################################
 epochs = 50
-lr = 0.0001
+lr = 0.00002
 #####################################################################
 
 #####################################################################
@@ -42,7 +44,7 @@ dev_utt = list(dev_feat.keys())
 
 for dataset in [adapt_feat, dev_feat]:
     for utt_id, feat_mat in dataset.items():
-        # feat_mat = matrix_normalize(feat_mat, axis=1, fcn_type="mean")
+        feat_mat = pp.matrix_normalize(feat_mat, axis=1, fcn_type="mean")
         feat_mat = torch.Tensor(feat_mat).cuda().float()
         dataset[utt_id] = feat_mat
 
@@ -51,8 +53,8 @@ model_si.load_state_dict(torch.load(si_dir+"/final.pt"))
 model_si.cuda()
 model_si.eval()
 
-# model_sa = net.FDLR(feat_dim=120, context_size=5)
-model_sa = net.Generator_CNN(feat_dim=120)
+model_sa = net.FDLR(feat_dim=120, hidden_dim=512)
+#model_sa = net.Generator_CNN(feat_dim=120)
 torch.save(model_sa, sa_dir+"/init.pt")
 model_sa.cuda()
 model_opt = optim.Adam(model_sa.parameters(), lr=lr)

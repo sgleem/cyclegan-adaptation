@@ -16,8 +16,8 @@ from tool.kaldi.kaldi_manager import read_feat
 
 #####################################################################
 parser = argparse.ArgumentParser()
-parser.add_argument("--adapt_dir", default="data/ntimit/adapt", type=str)
-parser.add_argument("--dev_dir", default="data/ntimit/dev", type=str)
+parser.add_argument("--adapt_dir", default="data/ffmtimit/adapt", type=str)
+parser.add_argument("--dev_dir", default="data/ffmtimit/dev", type=str)
 parser.add_argument("--clean_dir", default="data/timit/target", type=str)
 parser.add_argument("--model_dir", default="model/cyclegan", type=str)
 parser.add_argument("--rank", default=0, type=int)
