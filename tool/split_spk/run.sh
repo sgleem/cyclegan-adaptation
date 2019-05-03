@@ -36,7 +36,7 @@ package_dir=`dirname $0`
 python3 ${package_dir}/prepare.py $inDir $rootDir $train_num $total_num $start_idx || exit 1;
 
 
-for dType in adapt dev; do
+for dType in adapt; do
     outDir=${rootDir}/${dType}
 
     #   1. Read Uttlist ( cat | sort | uniq )
