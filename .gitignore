@@ -5,4 +5,3 @@ model/*
 *.txt
 *.log
 *.zip
-gmm_hmm/*
