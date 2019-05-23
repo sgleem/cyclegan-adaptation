@@ -2,7 +2,7 @@ data/*
 ali/*
 model/*
 gmm_hmm/*
-gmm*
+gmm/*
 *.pyc
 *.txt
 *.log
