@@ -11,8 +11,8 @@ from tool.kaldi import kaldi_io as kio
 from tool.kaldi.kaldi_manager import read_feat
 #####################################################################
 parser = argparse.ArgumentParser()
-parser.add_argument("--data_dir", default="data/ffmtimit/test", type=str)
-parser.add_argument("--si_dir", default="model/gru_si", type=str)
+parser.add_argument("--data_dir", default="data/wsj/test", type=str)
+parser.add_argument("--si_dir", default="model/gru_wsj", type=str)
 parser.add_argument("--sa_dir", default="", type=str)
 args = parser.parse_args()
 #####################################################################
@@ -41,16 +41,17 @@ if sa_dir is not "":
     model_sa.load_state_dict(torch.load(sa_dir+"/final.pt"))
     model_sa.cuda()
     model_sa.eval()
-
-print(model_sa)
+    print(model_sa)
 
 kaldi_fp = kio.open_or_fd(si_dir+"/decode/lld.ark", 'wb')
 with torch.no_grad():
     for utt_id, feat_mat in test_feat.items():
-        feat_mat = matrix_normalize(feat_mat, axis=1, fcn_type="mean")
-        x = torch.Tensor([feat_mat]).cuda().float()
+        # feat_mat = matrix_normalize(feat_mat, axis=1, fcn_type="mean")
+        x = torch.Tensor(feat_mat).cuda().float()
+        # x = torch.Tensor([feat_mat]).cuda().float()
         if sa_dir is not "":
-            x = model_sa(x)[0]
+            x = model_sa(x)
+            # x = model_sa(x)[0]
         y = dnn_am(x)
 
         post_prob = y.cpu().numpy()

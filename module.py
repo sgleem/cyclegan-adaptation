@@ -69,4 +69,3 @@ class Residual(nn.Module):
         h3 = self.cnn2(glu); h3_norm = self.cnn2_norm(h3)
         out = h3_norm + x
         return out
-    

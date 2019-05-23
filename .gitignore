@@ -3,4 +3,5 @@ ali/*
 model/*
 *.pyc
 *.txt
+*.log
 *.zip

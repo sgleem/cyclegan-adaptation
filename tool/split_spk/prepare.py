@@ -72,13 +72,13 @@ def extract_set(s2u, adapt_num, dev_num, start_idx=0):
             test_start: (dev_end) % total_len
             test_end: (dev_end+test_txt_num) % total_len
     """
-    num = {"adapt": adapt_num, "dev": dev_num}
-    data_set = {"adapt": [], "dev": []}
+    num = {"adapt": adapt_num}
+    data_set = {"adapt": []}
     total_num = adapt_num + dev_num
     spk_list = list(s2u.keys())
 
     # 1, 2, 3) Iterate Set
-    for set_type in ["adapt", "dev"]:
+    for set_type in ["adapt"]:
         set_num = num[set_type]
         end_idx = (start_idx + set_num)
         for cur_idx in range(start_idx, end_idx):
@@ -123,7 +123,7 @@ if __name__=="__main__":
     # 5. make {adapt, dev, test} dir
     # 6. save to {adapt, dev, test}/uttlist
     for set_type, uttList in data_set.items():
-        set_dir = out_dir+"/"+set_type
+        set_dir = out_dir
         # 5. make {adapt, dev, test} dir
         os.system("mkdir -p " + set_dir)
         # 6. save to {adapt, dev, test}/uttlist

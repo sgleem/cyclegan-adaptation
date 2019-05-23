@@ -90,13 +90,13 @@ class Generator_CNN(nn.Module):
 
         self.downsample = nn.Sequential(
             ConvSample(inC=feat_dim, outC=128, k=5, s=1, p=2),
-            ConvSample(inC=128, outC=256, k=5, s=1, p=2)
+            ConvSample(inC=128, outC=256, k=5, s=1, p=2),
         )
         self.res = nn.Sequential(
             Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
             Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
             Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
-            Residual(inC=256, hiddenC=512, k=3, s=1, p=1)
+            Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
         )
         self.upsample = nn.Sequential(
             ConvSample(inC=256, outC=128, k=5, s=1, p=2),
@@ -136,3 +136,80 @@ class Discriminator_CNN(nn.Module):
         out = torch.sigmoid(out)
         
         return out
+
+######### Speaker normalizer #########
+class D_domain(nn.Module):
+    """
+    Define true or normalized
+    """
+    def __init__(self, *args, **kwargs):
+        super(D_domain, self).__init__()
+        feat_dim = kwargs.get("feat_dim", 120)
+        hidden_dim = kwargs.get("hidden_dim", 512)
+        self.downsample = nn.Sequential(
+            ConvSample(inC=feat_dim, outC=128, k=5, s=1, p=2),
+            ConvSample(inC=128, outC=256, k=5, s=1, p=2)
+        )
+        self.out = nn.Sequential(
+            nn.Linear(256, hidden_dim), nn.LeakyReLU(),
+            nn.Linear(hidden_dim, 1)
+        )
+
+    def forward(self, x):
+        x = x.permute(0, 2, 1)
+        h = self.downsample(x)
+        h = h.permute(0, 2, 1)
+        out = self.out(h)
+        out = torch.sigmoid(out)
+
+        return out
+
+class D_spk(nn.Module):
+    """
+    Define speaker
+    """
+    def __init__(self, *args, **kwargs):
+        super(D_spk, self).__init__()
+        feat_dim = kwargs.get("feat_dim", 120)
+        spk_dim = kwargs.get("spk_dim", 283)
+        self.downsample = nn.Sequential(
+            ConvSample(inC=feat_dim, outC=128, k=5, s=1, p=2),
+            ConvSample(inC=128, outC=256, k=5, s=1, p=2)
+        )
+        self.out = nn.Sequential(
+            nn.Linear(256, feat_dim), nn.LeakyReLU(),
+            nn.Linear(feat_dim, spk_dim), nn.LogSoftmax(dim=2)
+        )
+
+    def forward(self, x):
+        x = x.permute(0, 2, 1)
+        h = self.downsample(x)
+        h = h.permute(0, 2, 1)
+        out = self.out(h)
+        return out
+
+class Gc(nn.Module):
+    """
+    (120 * 128) -> (120 * 128) + (120 * 128) -> (120 * 128)
+    """
+    def __init__(self, *args, **kwargs):
+        super(Gc, self).__init__()
+        feat_dim = kwargs.get("feat_dim", 120)
+        self.downsample = nn.Sequential(
+            ConvSample(inC=feat_dim, outC=128, k=5, s=1, p=2),
+            ConvSample(inC=128, outC=256, k=5, s=1, p=2)
+        )
+        self.out = nn.Sequential(
+            nn.Linear(256, hidden_dim), nn.LeakyReLU(),
+            nn.Linear(hidden_dim, 1)
+        )
+
+    def forward(self, x):
+        x = x.permute(0, 2, 1)
+        h = self.downsample(x)
+        h = h.permute(0, 2, 1)
+        out = self.out(h)
+        out = torch.sigmoid(out)
+        
+        return out
+

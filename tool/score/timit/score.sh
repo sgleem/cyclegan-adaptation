@@ -12,7 +12,7 @@ iter=final
 
 score=`dirname $0`
 
-. $score/parse_options.sh || exit 1;
+. $score/../parse_options.sh || exit 1;
 
 if [ $# -ne 3 ]; then
   echo "Usage: score_timit.sh <data-dir> <lang-dir|graph-dir> <decode-dir>"
@@ -63,7 +63,7 @@ if [ $stage -le 1 ]; then
   $cmd LMWT=$min_lmwt:$max_lmwt $dir/scoring/log/map_ctm.LMWT.log \
      mkdir -p $dir/score_LMWT ';' \
      cat $dir/scoring/LMWT.ctm \| \
-     $score/int2sym.pl -f 5 $symtab \| \
+     $score/../int2sym.pl -f 5 $symtab \| \
      $score/timit_norm_trans.pl -i - -m $phonemap -from 48 -to 39 '>' \
      $dir/scoring/LMWT.ctm_39phn || exit 1
 fi

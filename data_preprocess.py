@@ -67,7 +67,7 @@ def matrix_normalize(origin_mat, axis=None, fcn_type="mean"):
     
     return norm_mat
 
-def make_cnn_dataset(utt_dict, input_size=128):
+def make_cnn_dataset(utt_dict, input_size=128, step_size=64):
     segment_set = []
     for frame_mat in utt_dict.values():
     
@@ -75,7 +75,7 @@ def make_cnn_dataset(utt_dict, input_size=128):
         if frame_len < input_size:
             continue
         
-        for start_idx in range(0, frame_len-input_size+1, input_size//4):
+        for start_idx in range(0, frame_len-input_size+1, step_size):
             segment = frame_mat[start_idx:start_idx+input_size]
             segment_set.append(segment)
     return segment_set

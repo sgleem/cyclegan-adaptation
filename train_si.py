@@ -9,17 +9,18 @@ import torch.optim as opt
 import torch.optim.lr_scheduler as sch
 
 import net
+import data_preprocess as pp
 from tool.log import LogManager
 from tool.loss import nllloss, calc_err
 from tool.kaldi.kaldi_manager import read_feat, read_ali
-from preprocess import matrix_normalize
+
 #####################################################################
 parser = argparse.ArgumentParser()
-parser.add_argument("--train_feat_dir", default="data/timit/train", type=str)
-parser.add_argument("--train_ali_dir", default="ali/timit/train", type=str)
-parser.add_argument("--dev_feat_dir", default="data/timit/dev", type=str)
-parser.add_argument("--dev_ali_dir", default="ali/timit/dev", type=str)
-parser.add_argument("--model_dir", default="model/gru", type=str)
+parser.add_argument("--train_feat_dir", default="data/wsj/train", type=str)
+parser.add_argument("--train_ali_dir", default="ali/wsj/train", type=str)
+parser.add_argument("--dev_feat_dir", default="data/wsj/dev", type=str)
+parser.add_argument("--dev_ali_dir", default="ali/wsj/dev", type=str)
+parser.add_argument("--model_dir", default="model/gru_wsj_norm", type=str)
 parser.add_argument("--rank", default=0, type=int)
 parser.add_argument("--size", default=1, type=int)
 args = parser.parse_args()
@@ -32,7 +33,7 @@ model_dir = args.model_dir
 #####################################################################
 epochs = 24
 lr = 0.0001
-pdf_num = 1920
+pdf_num = 3424
 #####################################################################
 os.system("mkdir -p " + model_dir + "/parm")
 os.system("mkdir -p " + model_dir + "/opt")
@@ -46,7 +47,7 @@ dev_ali = read_ali(dev_ali_dir+"/ali.*.gz", dev_ali_dir+"/final.mdl")
 train_utt = list(train_feat.keys())
 dev_utt = list(dev_feat.keys())
 
-model = net.GRU_HMM(input_dim=120, hidden_dim=465, num_layers=5, output_dim=pdf_num)
+model = net.GRU_HMM(input_dim=120, hidden_dim=512, num_layers=5, output_dim=pdf_num)
 torch.save(model, model_dir+"/init.pt")
 model.cuda()
 model_opt = opt.Adam(model.parameters(), lr=lr)
@@ -58,10 +59,8 @@ lm.alloc_stat_type_list(["train_loss","train_acc","dev_loss","dev_acc"])
 # preprocess
 for dataset in [train_feat, dev_feat]:
     for utt_id, feat_mat in dataset.items():
-        feat_mat = matrix_normalize(feat_mat, axis=0, fcn_type="mean")
-        feat_mat = torch.Tensor(feat_mat).cuda().float()
+        feat_mat = pp.matrix_normalize(feat_mat, axis=1, fcn_type="mean")
         dataset[utt_id] = feat_mat
-
 # prior calculation
 prior = np.zeros(pdf_num)
 for align in train_ali.values():
@@ -70,7 +69,6 @@ for align in train_ali.values():
 prior /= np.sum(prior)
 with open(model_dir+"/prior.pk", 'wb') as f:
     pk.dump(prior, f)
-
 # model training
 for epoch in range(epochs):
     print("Epoch",epoch)
@@ -79,8 +77,12 @@ for epoch in range(epochs):
     lm.init_stat()
     for utt_id in train_utt:
         x = train_feat[utt_id]
-        ali = train_ali[utt_id]
+        # ali = train_ali[utt_id]
+        ali = train_ali.get(utt_id,[])
+        if len(ali) == 0:
+            continue
 
+        x = torch.Tensor(x).cuda().float()
         y = torch.Tensor(ali).cuda().long()
 
         pred = model(x)
@@ -100,6 +102,7 @@ for epoch in range(epochs):
             x = dev_feat[utt_id]
             ali = dev_ali[utt_id]
 
+            x = torch.Tensor(x).cuda().float()
             y = torch.Tensor(ali).cuda().long()
 
             pred = model(x)
