@@ -43,6 +43,8 @@ if sa_dir is not "":
     model_sa.eval()
     print(model_sa)
 
+print(model_sa)
+
 kaldi_fp = kio.open_or_fd(si_dir+"/decode/lld.ark", 'wb')
 with torch.no_grad():
     for utt_id, feat_mat in test_feat.items():

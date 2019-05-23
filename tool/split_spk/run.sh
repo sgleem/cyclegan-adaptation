@@ -37,7 +37,7 @@ python3 ${package_dir}/prepare.py $inDir $rootDir $train_num $total_num $start_i
 
 
 for dType in adapt; do
-    outDir=${rootDir}
+    outDir=${rootDir}/${dType}
 
     #   1. Read Uttlist ( cat | sort | uniq )
     uttList=( $( cat ${outDir}/uttlist ) )

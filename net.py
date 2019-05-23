@@ -90,13 +90,13 @@ class Generator_CNN(nn.Module):
 
         self.downsample = nn.Sequential(
             ConvSample(inC=feat_dim, outC=128, k=5, s=1, p=2),
-            ConvSample(inC=128, outC=256, k=5, s=1, p=2),
+            ConvSample(inC=128, outC=256, k=5, s=1, p=2)
         )
         self.res = nn.Sequential(
             Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
             Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
             Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
-            Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
+            Residual(inC=256, hiddenC=512, k=3, s=1, p=1)
         )
         self.upsample = nn.Sequential(
             ConvSample(inC=256, outC=128, k=5, s=1, p=2),
