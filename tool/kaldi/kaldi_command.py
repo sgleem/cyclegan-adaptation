@@ -21,6 +21,16 @@ def copy_feats(feat_path="-", out_path="-"):
     result_cmd=make_kaldi_cmd(kaldi_cmd, r_specifier, o_specifier)
     return result_cmd
 
+def copy_vector(vec_path="-", out_path="-"):
+    """
+    copy-vector <ark,scp:feats.ark,scp> <ark:-> |
+    """
+    kaldi_cmd="copy-vector"
+    r_specifier=get_specifier(vec_path)
+    o_specifier=get_specifier(out_path)
+    result_cmd=make_kaldi_cmd(kaldi_cmd, r_specifier, o_specifier)
+    return result_cmd
+
 def apply_cmvn(u2s_path, cmvn_path, feat_path="-", out_path="-"):
     """
     apply-cmvn <--utt2spk=ark:utt2spk> <scp:cmvn.scp> <ark:feats.scp> <ark:-> |

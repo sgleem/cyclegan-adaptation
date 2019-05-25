@@ -21,6 +21,7 @@ class KaldiReadManager:
         store for kaldi command
         """
         self.cmd_book["copy-feats"] = kc.copy_feats
+        self.cmd_book["copy-vector"] = kc.copy_vector
         self.cmd_book["apply-cmvn"] = kc.apply_cmvn
         self.cmd_book["add-deltas"] = kc.add_deltas
         self.cmd_book["splice-feats"] = kc.splice_feats
@@ -41,9 +42,12 @@ class KaldiReadManager:
         result = {utt_id: np.array(frame_mat) for utt_id, frame_mat in generator}
         return result
 
-    def read_to_vec(self):
+    def read_to_vec(self, type='int'):
         print("run",self.cmd)
-        generator = kaldi_io.read_vec_int_ark(self.cmd)
+        if type=='int':
+            generator = kaldi_io.read_vec_int_ark(self.cmd)
+        if type=='float':
+            generator = kaldi_io.read_vec_flt_ark(self.cmd)
         result = {utt_id: np.array(vec) for utt_id, vec in generator}
         return result
 
@@ -61,5 +65,11 @@ def read_ali(ali_path, mdl_path):
     km = KaldiReadManager()
     km.set_command("gunzip", ali_path)
     km.set_command("ali-to-pdf", mdl_path)
-    ali_dict = km.read_to_vec()
+    ali_dict = km.read_to_vec(type='int')
+    return ali_dict
+
+def read_vec(vec_path):
+    km = KaldiReadManager()
+    km.set_command("copy-vector", vec_path)
+    ali_dict = km.read_to_vec(type='float')
     return ali_dict

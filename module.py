@@ -29,7 +29,7 @@ class ConvSample2D(nn.Module):
         inC = kwargs.get("inC", 1)
         outC = kwargs.get("outC", 16)
         k = kwargs.get("k", 3)
-        s = 1
+        s = kwargs.get("s", 1)
         p = kwargs.get("p", 1)
 
         self.cnn = nn.Conv2d(inC, outC, kernel_size=k, stride=s, padding=p)
@@ -69,3 +69,26 @@ class Residual(nn.Module):
         h3 = self.cnn2(glu); h3_norm = self.cnn2_norm(h3)
         out = h3_norm + x
         return out
+
+class ReLU(nn.Module):
+    def __init__(self, *args, **kwargs):
+        super(ReLU, self).__init__()
+        input_dim = kwargs.get("input_dim", 120)
+        output_dim = kwargs.get("output_dim", 1024)
+        
+        batch_norm = kwargs.get("batch_norm", True)
+        dropout = kwargs.get("dropout", 0)
+
+        self.linear = nn.Linear(input_dim, output_dim)
+        self.batchnorm = nn.BatchNorm1d(output_dim) if batch_norm else None
+        self.act = nn.ReLU()
+        self.dropout = nn.Dropout(dropout) if 0 < dropout < 1 else None
+    def forward(self, x):
+        h = self.linear(x)
+        if self.batchnorm is not None:
+            h = self.batchnorm(h)
+        h = self.act(h)
+        if self.dropout is not None:
+            h = self.dropout(h)
+        
+        return h

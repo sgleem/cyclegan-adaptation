@@ -80,3 +80,24 @@ def make_cnn_dataset(utt_dict, input_size=128, step_size=64):
             segment_set.append(segment)
     return segment_set
 
+def make_spk_cnn_set(utt_dict, frame_size=128, step_size=64):
+    """ only for VAE """
+    cnn_dict = dict()
+    for utt_id, frame_mat in utt_dict.items():
+        spk_id = utt_id[:3] # for WSJ
+        #spk_id = utt_id.split("_")[0] # for TIMIT
+            
+        frame_len = len(frame_mat)
+        # if total length is smaller than pre-defined frame size
+        if frame_len < frame_size:
+            continue
+        
+        # make segment
+        segment_set = cnn_dict.get(spk_id, [])
+        for start_idx in range(0, frame_len-frame_size+1, step_size):
+            segment = frame_mat[start_idx:start_idx+frame_size]
+            segment_set.append(segment) # tuple
+        cnn_dict[spk_id] = segment_set
+        
+    return cnn_dict
+

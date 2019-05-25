@@ -1,7 +1,9 @@
 data/*
 ali/*
 model/*
-gmm/*
+gmm_hmm/*
+temp/*
+utils
 *.pyc
 *.txt
 *.log

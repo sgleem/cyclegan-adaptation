@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from module import ConvSample, Residual, ConvSample2D
+from module import ConvSample, Residual, ConvSample2D, ReLU
 
 class GRU_HMM(nn.Module):
     def __init__(self, *args, **kwargs):
@@ -138,78 +138,133 @@ class Discriminator_CNN(nn.Module):
         return out
 
 ######### Speaker normalizer #########
-class D_domain(nn.Module):
+
+class VAE_Encoder(nn.Module):
     """
-    Define true or normalized
+    (N, T, 120) -> (N , 120 -> 240 -> 480 -> 480 -> 480 -> 480 -> 240 -> 120, T) -> (N, T, 120)
     """
     def __init__(self, *args, **kwargs):
-        super(D_domain, self).__init__()
+        super(VAE_Encoder, self).__init__()
         feat_dim = kwargs.get("feat_dim", 120)
-        hidden_dim = kwargs.get("hidden_dim", 512)
-        self.downsample = nn.Sequential(
-            ConvSample(inC=feat_dim, outC=128, k=5, s=1, p=2),
-            ConvSample(inC=128, outC=256, k=5, s=1, p=2)
+        self.cnn_encoder = nn.Sequential(
+            ConvSample(inC=feat_dim, outC=feat_dim*2, k=3, s=1, p=1),
+            ConvSample(inC=feat_dim*2, outC=feat_dim*4, k=3, s=1, p=1),
+            Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
+            Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
+            Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
+            ConvSample(inC=feat_dim*4, outC=feat_dim*2, k=3, s=1, p=1),
+            ConvSample(inC=feat_dim*2, outC=feat_dim, k=3, s=1, p=1)
         )
         self.out = nn.Sequential(
-            nn.Linear(256, hidden_dim), nn.LeakyReLU(),
-            nn.Linear(hidden_dim, 1)
+            nn.Linear(feat_dim, feat_dim)
         )
 
     def forward(self, x):
         x = x.permute(0, 2, 1)
-        h = self.downsample(x)
+        h = self.cnn_encoder(x)
         h = h.permute(0, 2, 1)
         out = self.out(h)
-        out = torch.sigmoid(out)
-
-        return out
-
-class D_spk(nn.Module):
-    """
-    Define speaker
-    """
-    def __init__(self, *args, **kwargs):
-        super(D_spk, self).__init__()
-        feat_dim = kwargs.get("feat_dim", 120)
-        spk_dim = kwargs.get("spk_dim", 283)
-        self.downsample = nn.Sequential(
-            ConvSample(inC=feat_dim, outC=128, k=5, s=1, p=2),
-            ConvSample(inC=128, outC=256, k=5, s=1, p=2)
-        )
-        self.out = nn.Sequential(
-            nn.Linear(256, feat_dim), nn.LeakyReLU(),
-            nn.Linear(feat_dim, spk_dim), nn.LogSoftmax(dim=2)
-        )
-
-    def forward(self, x):
-        x = x.permute(0, 2, 1)
-        h = self.downsample(x)
-        h = h.permute(0, 2, 1)
-        out = self.out(h)
-        return out
-
-class Gc(nn.Module):
-    """
-    (120 * 128) -> (120 * 128) + (120 * 128) -> (120 * 128)
-    """
-    def __init__(self, *args, **kwargs):
-        super(Gc, self).__init__()
-        feat_dim = kwargs.get("feat_dim", 120)
-        self.downsample = nn.Sequential(
-            ConvSample(inC=feat_dim, outC=128, k=5, s=1, p=2),
-            ConvSample(inC=128, outC=256, k=5, s=1, p=2)
-        )
-        self.out = nn.Sequential(
-            nn.Linear(256, hidden_dim), nn.LeakyReLU(),
-            nn.Linear(hidden_dim, 1)
-        )
-
-    def forward(self, x):
-        x = x.permute(0, 2, 1)
-        h = self.downsample(x)
-        h = h.permute(0, 2, 1)
-        out = self.out(h)
-        out = torch.sigmoid(out)
         
         return out
 
+class VAE_Speaker(nn.Module):
+    """
+    (N, 100 -> 512 -> 512 -> 480*2) 
+    """
+    def __init__(self, *args, **kwargs):
+        super(VAE_Speaker, self).__init__()
+        feat_dim = kwargs.get("feat_dim", 120)
+        hidden_dim = kwargs.get("hidden_dim", 512)
+        output_dim = kwargs.get("output_dim", 480)
+
+        self.mlp = nn.Sequential(
+            ReLU(input_dim=feat_dim, output_dim=hidden_dim, batch_norm=True, dropout=0),
+            ReLU(input_dim=hidden_dim, output_dim=hidden_dim, batch_norm=True, dropout=0)
+        )
+        self.mean = nn.Sequential(
+            nn.Linear(hidden_dim, output_dim),
+            nn.Tanh()
+        )
+        self.logvar = nn.Sequential(
+            nn.Linear(hidden_dim, output_dim),
+            nn.Tanh()
+        )
+
+    def forward(self, x):
+        h = self.mlp(x)
+        m = self.mean(h)
+        s = self.logvar(h)
+        out = torch.exp(s) * torch.randn_like(m) + m
+        
+        return m, s, out
+
+class VAE_Generator(nn.Module):
+    """
+    (N, T, 120) -> (N , 120 -> 240 -> 480, T) -> (N, 480+ivec -> 480+ivec -> 480+ivec -> 480, T) -> (N, 480 -> 240 -> 120, T) -> (N, T, 120)
+    ivec (N, 480)
+    """
+    def __init__(self, *args, **kwargs):
+        super(VAE_Generator, self).__init__()
+        feat_dim = kwargs.get("feat_dim", 120)
+        self.downsample = nn.Sequential(
+            ConvSample(inC=feat_dim, outC=feat_dim*2, k=3, s=1, p=1),
+            ConvSample(inC=feat_dim*2, outC=feat_dim*4, k=3, s=1, p=1)
+        )
+        self.res = nn.ModuleList([
+            Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
+            Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
+            Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1)
+        ])
+        self.upsample = nn.Sequential(
+            ConvSample(inC=feat_dim*4, outC=feat_dim*2, k=3, s=1, p=1),
+            ConvSample(inC=feat_dim*2, outC=feat_dim, k=3, s=1, p=1)
+        )
+        self.out = nn.Sequential(
+            nn.Linear(feat_dim, feat_dim)
+        )
+
+    def forward(self, x, ivec):
+        x = x.permute(0, 2, 1)
+        h = self.downsample(x)
+        spk = ivec.unsqueeze(dim=2)
+        for res in self.res:
+            h = spk+h
+            h = res(h)
+        h = self.upsample(h)
+        h = h.permute(0, 2, 1)
+        out = self.out(h)
+        
+        return out
+
+class VAE_Discriminator(nn.Module):
+    """
+    (N, 128, 120) -> (N, 1, 128, 120) -> (N, 4, 64, 60) -> (N, 16, 32, 30)
+    -> (N, 128*120 -> 512 -> 512 -> 1 & 283)
+    """
+    def __init__(self, *args, **kwargs):
+        super(VAE_Discriminator, self).__init__()
+        feat_dim = kwargs.get("feat_dim", 120)
+        hidden_dim = kwargs.get("hidden_dim", 512)
+        spk_dim = kwargs.get("spk_dim", 283)
+        self.spk_dim = spk_dim
+
+        self.downsample = nn.Sequential(
+            ConvSample2D(inC=1, outC=4, k=4, s=2, p=1),
+            ConvSample2D(inC=4, outC=16, k=4, s=2, p=1)
+        )
+        self.mlp = nn.Sequential(
+            ReLU(input_dim=feat_dim*128, output_dim=hidden_dim, batch_norm=False, dropout=0),
+            ReLU(input_dim=hidden_dim, output_dim=hidden_dim, batch_norm=False, dropout=0)
+        )
+        self.tf = nn.Linear(hidden_dim, 1)
+        self.spk = nn.Linear(hidden_dim, spk_dim)
+
+    def forward(self, x):
+        x = x.unsqueeze(dim=1)
+        h = self.downsample(x)
+        h = torch.flatten(h, start_dim=1)
+        h = self.mlp(h)
+        tf = self.tf(h); tf = torch.sigmoid(tf)
+        spk = self.spk(h); spk = F.log_softmax(spk, dim=1)
+        
+        return tf, spk

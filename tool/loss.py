@@ -26,6 +26,13 @@ def lsadvloss(gen, true):
     """
     return l2loss(gen, 1) / 2 + l2loss(true, 0) / 2
 
+def kl_for_vae(mean, logvar):
+    # -1/2 * {sigma(1+logvar - mean^2 - var)}
+    # mean : (N, 480)
+    kl = 1 + logvar - torch.pow(mean, 2) - torch.exp(logvar)
+    kl = (torch.sum(kl) / 2) * (-1)
+    return kl
+
 def calc_err(pred, true):
     ans = torch.max(pred,dim=1)[1]
     err = torch.mean((true!=ans).float())
