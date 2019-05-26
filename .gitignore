@@ -4,6 +4,7 @@ model/*
 gmm_hmm/*
 temp/*
 utils
+sharedfile
 *.pyc
 *.txt
 *.log
