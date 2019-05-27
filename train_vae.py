@@ -51,6 +51,11 @@ dev_storage = read_feat(dev_dir+"/feats.ark", delta=True)
 train_ivecs = read_vec(train_dir+"/ivectors.ark")
 dev_ivecs = read_vec(dev_dir+"/ivectors.ark")
 
+for dataset in [train_storage, dev_storage]:
+    for utt_id, feat_mat in dataset.items():
+        feat_mat = pp.matrix_normalize(feat_mat, axis=1, fcn_type="mean")
+        dataset[utt_id] = feat_mat
+
 # {spk_id:[segment(128*120)1, seg2, seg3, ...]}
 train_segs = pp.make_spk_cnn_set(train_storage, frame_size=frame_size, step_size=step_size); print(len(train_segs))
 dev_segs = pp.make_spk_cnn_set(dev_storage, frame_size=frame_size, step_size=step_size); print(len(dev_segs))
