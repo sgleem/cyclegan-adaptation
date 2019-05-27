@@ -72,7 +72,7 @@ class Residual(nn.Module):
 
 class Residual_Cat(nn.Module):
     def __init__(self, *args, **kwargs):
-        super(Residual, self).__init__()
+        super(Residual_Cat, self).__init__()
         inC = kwargs.get("inC", 512)
         auxC = kwargs.get("auxC", 512)
         outC = kwargs.get("hiddenC", 1024)
