@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from module import ConvSample, Residual, ConvSample2D, ReLU
+from module import ConvSample, Residual,Residual_Cat, ConvSample2D, ReLU
 
 class GRU_HMM(nn.Module):
     def __init__(self, *args, **kwargs):
@@ -200,7 +200,7 @@ class VAE_Speaker(nn.Module):
 
 class VAE_Generator(nn.Module):
     """
-    (N, T, 120) -> (N , 120 -> 240 -> 480, T) -> (N, 480+ivec -> 480+ivec -> 480+ivec -> 480, T) -> (N, 480 -> 240 -> 120, T) -> (N, T, 120)
+    (N, T, 120) -> (N , 120 -> 240 -> 480, T) -> (N, 480+480 -> 480+480 -> 480+480 -> 480, T) -> (N, 480 -> 240 -> 120, T) -> (N, T, 120)
     ivec (N, 480)
     """
     def __init__(self, *args, **kwargs):
@@ -208,12 +208,15 @@ class VAE_Generator(nn.Module):
         feat_dim = kwargs.get("feat_dim", 120)
         self.downsample = nn.Sequential(
             ConvSample(inC=feat_dim, outC=feat_dim*2, k=3, s=1, p=1),
-            ConvSample(inC=feat_dim*2, outC=feat_dim*4, k=3, s=1, p=1)
+            ConvSample(inC=feat_dim*2, outC=feat_dim*4 k=3, s=1, p=1)
         )
         self.res = nn.ModuleList([
-            Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
-            Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
-            Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1)
+            # Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
+            # Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
+            # Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1)
+            Residual_Cat(inC=feat_dim*4, auxC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
+            Residual_Cat(inC=feat_dim*4, auxC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
+            Residual_Cat(inC=feat_dim*4, auxC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1)
         ])
         self.upsample = nn.Sequential(
             ConvSample(inC=feat_dim*4, outC=feat_dim*2, k=3, s=1, p=1),
@@ -226,10 +229,10 @@ class VAE_Generator(nn.Module):
     def forward(self, x, ivec):
         x = x.permute(0, 2, 1)
         h = self.downsample(x)
-        spk = ivec.unsqueeze(dim=2)
+        spk = ivec.unsqueeze(dim=2).expand_as(h)
         for res in self.res:
-            h = spk+h
-            h = res(h)
+            # h = spk+h
+            h = res(h, spk)
         h = self.upsample(h)
         h = h.permute(0, 2, 1)
         out = self.out(h)

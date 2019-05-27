@@ -70,6 +70,37 @@ class Residual(nn.Module):
         out = h3_norm + x
         return out
 
+class Residual_Cat(nn.Module):
+    def __init__(self, *args, **kwargs):
+        super(Residual, self).__init__()
+        inC = kwargs.get("inC", 512)
+        auxC = kwargs.get("auxC", 512)
+        outC = kwargs.get("hiddenC", 1024)
+        resC = inC
+        inC = inC + auxC
+
+        k = kwargs.get("k", 3)
+        s = 1
+        p = kwargs.get("p", 1)
+
+        self.cnn1 = nn.Conv1d(inC, outC, kernel_size=k, stride=s, padding=p)
+        self.cnn1_norm = nn.InstanceNorm1d(outC)
+        self.gate = nn.Conv1d(inC, outC, kernel_size=k, stride=s, padding=p)
+        self.gate_norm = nn.InstanceNorm1d(outC)
+
+        self.cnn2 = nn.Conv1d(outC, resC, kernel_size=k, stride=s, padding=p)
+        self.cnn2_norm = nn.InstanceNorm1d(inC)
+    def forward(self, inX, auX):
+        x = torch.cat((inX, auX), dim=1)
+        h1 = self.cnn1(x); h1_norm = self.cnn1_norm(h1)
+        h2 = self.gate(x); h2_norm = self.gate_norm(h2)
+        h2_sig = torch.sigmoid(h2_norm)
+        glu = h1_norm * h2_sig
+
+        h3 = self.cnn2(glu); h3_norm = self.cnn2_norm(h3)
+        out = h3_norm + inX
+        return out
+
 class ReLU(nn.Module):
     def __init__(self, *args, **kwargs):
         super(ReLU, self).__init__()

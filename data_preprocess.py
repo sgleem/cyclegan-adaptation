@@ -84,8 +84,8 @@ def make_spk_cnn_set(utt_dict, frame_size=128, step_size=64):
     """ only for VAE """
     cnn_dict = dict()
     for utt_id, frame_mat in utt_dict.items():
-        spk_id = utt_id[:3] # for WSJ
-        #spk_id = utt_id.split("_")[0] # for TIMIT
+        # spk_id = utt_id[:3] # for WSJ
+        spk_id = utt_id.split("_")[0] # for TIMIT
             
         frame_len = len(frame_mat)
         # if total length is smaller than pre-defined frame size

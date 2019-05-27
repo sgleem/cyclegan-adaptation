@@ -11,14 +11,14 @@ import torch.optim.lr_scheduler as scheduler
 from torch.utils.data import DataLoader
 
 from tool.log import LogManager
-from tool.loss import nllloss, l2loss, kl_for_vae
+from tool.loss import nllloss, l1loss,l2loss, kl_for_vae
 from tool.kaldi.kaldi_manager import read_feat, read_vec
 
 #####################################################################
 parser = argparse.ArgumentParser()
-parser.add_argument("--train_dir", default="data/wsj/train", type=str)
-parser.add_argument("--dev_dir", default="data/wsj/dev", type=str)
-parser.add_argument("--model_dir", default="model/vae_encoder", type=str)
+parser.add_argument("--train_dir", default="data/timit/train", type=str)
+parser.add_argument("--dev_dir", default="data/timit/dev", type=str)
+parser.add_argument("--model_dir", default="model/vae_timit", type=str)
 parser.add_argument("--rank", default=0, type=int)
 parser.add_argument("--size", default=1, type=int)
 args = parser.parse_args()
@@ -28,7 +28,7 @@ dev_dir = args.dev_dir
 model_dir = args.model_dir
 #####################################################################
 epochs = 1000
-batch_size = 32
+batch_size = 2
 frame_size = 128
 step_size = 64
 
@@ -39,7 +39,7 @@ lr_d = 0.00001
 change_epoch = 2000
 save_per_epoch = 5
 
-adv_coef = 1.0; spk_coef = 3.0; cyc_coef = 10.0; kl_coef = 1.0
+adv_coef = 1.0; spk_coef = 10.0; cyc_coef = 5.0; kl_coef = 1.0
 #####################################################################
 torch.cuda.empty_cache()
 os.system("mkdir -p "+ model_dir +"/parm")
@@ -115,8 +115,16 @@ for epoch in range(epochs):
         model.train()
     # D & SPK phase
     for spk_ids, idxs in train_loader:
-        dA = [(spk_ids[i], idxs[i]) for i in range(len(spk_ids)//2)]
-        dB = [(spk_ids[i], idxs[i]) for i in range(len(spk_ids)//2, len(spk_ids))]
+        total_len = len(spk_ids)
+        if total_len % 2 == 0: # even
+            start_A = 0; start_B = total_len//2
+            end_A = start_B; end_B = total_len
+        else: # odd
+            start_A = 0; start_B = total_len//2
+            end_A = start_B + 1; end_B = total_len
+
+        dA = [(spk_ids[i], idxs[i]) for i in range(start_A, end_A)]
+        dB = [(spk_ids[i], idxs[i]) for i in range(start_B, end_B)]
         xA = [train_segs[spk_id][idx] for spk_id, idx in dA]; xA = torch.Tensor(xA).float().cuda() # (batch_size, 128, 120)
         xB = [train_segs[spk_id][idx] for spk_id, idx in dB]; xB = torch.Tensor(xB).float().cuda() # (batch_size, 128, 120)
         iA = [train_ivecs[spk_id] for spk_id, idx in dA]; iA = torch.Tensor(iA).float().cuda() # (batch_size, 100)
@@ -144,11 +152,18 @@ for epoch in range(epochs):
         # Save to Log
         lm.add_torch_stat("D_adv", D_adv)
         lm.add_torch_stat("D_spk", D_spk)
-        
     # G phase
     for spk_ids, idxs in train_loader:
-        dA = [(spk_ids[i], idxs[i]) for i in range(len(spk_ids)//2)]
-        dB = [(spk_ids[i], idxs[i]) for i in range(len(spk_ids)//2, len(spk_ids))]
+        total_len = len(spk_ids)
+        if total_len % 2 == 0: # even
+            start_A = 0; start_B = total_len//2
+            end_A = start_B; end_B = total_len
+        else: # odd
+            start_A = 0; start_B = total_len//2
+            end_A = start_B + 1; end_B = total_len
+
+        dA = [(spk_ids[i], idxs[i]) for i in range(start_A, end_A)]
+        dB = [(spk_ids[i], idxs[i]) for i in range(start_B, end_B)]
         xA = [train_segs[spk_id][idx] for spk_id, idx in dA]; xA = torch.Tensor(xA).float().cuda() # (batch_size, 128, 120)
         xB = [train_segs[spk_id][idx] for spk_id, idx in dB]; xB = torch.Tensor(xB).float().cuda() # (batch_size, 128, 120)
         iA = [train_ivecs[spk_id] for spk_id, idx in dA]; iA = torch.Tensor(iA).float().cuda() # (batch_size, 100)
@@ -170,7 +185,7 @@ for epoch in range(epochs):
         conA2B = VAE_E(A2B); A2B2A = VAE_G(conA2B, spkA)
         conB2A = VAE_E(B2A); B2A2B = VAE_G(conB2A, spkB)
 
-        cyc = l2loss(A2B2A, xA) + l2loss(B2A2B, xB)
+        cyc = l1loss(A2B2A, xA) + l1loss(B2A2B, xB)
         kl = kl_for_vae(meanA, stdA) + kl_for_vae(meanB, stdB)
 
         # Update Parameter
@@ -196,8 +211,16 @@ for epoch in range(epochs):
         model.eval()
     with torch.no_grad():
         for spk_ids, idxs in dev_loader:
-            dA = [(spk_ids[i], idxs[i]) for i in range(len(spk_ids)//2)]
-            dB = [(spk_ids[i], idxs[i]) for i in range(len(spk_ids)//2, len(spk_ids))]
+            total_len = len(spk_ids)
+            if total_len % 2 == 0: # even
+                start_A = 0; start_B = total_len//2
+                end_A = start_B; end_B = total_len
+            else: # odd
+                start_A = 0; start_B = total_len//2
+                end_A = start_B + 1; end_B = total_len
+
+            dA = [(spk_ids[i], idxs[i]) for i in range(start_A, end_A)]
+            dB = [(spk_ids[i], idxs[i]) for i in range(start_B, end_B)]
             xA = [dev_segs[spk_id][idx] for spk_id, idx in dA]; xA = torch.Tensor(xA).float().cuda() # (batch_size, 128, 120)
             xB = [dev_segs[spk_id][idx] for spk_id, idx in dB]; xB = torch.Tensor(xB).float().cuda() # (batch_size, 128, 120)
             iA = [dev_ivecs[spk_id] for spk_id, idx in dA]; iA = torch.Tensor(iA).float().cuda() # (batch_size, 100)
@@ -219,7 +242,7 @@ for epoch in range(epochs):
             conA2B = VAE_E(A2B); A2B2A = VAE_G(conA2B, spkA)
             conB2A = VAE_E(B2A); B2A2B = VAE_G(conB2A, spkB)
 
-            cyc = l2loss(A2B2A, xA) + l2loss(B2A2B, xB)
+            cyc = l1loss(A2B2A, xA) + l1loss(B2A2B, xB)
             kl = kl_for_vae(meanA, stdA) + kl_for_vae(meanB, stdB)
 
             # Save to Log
