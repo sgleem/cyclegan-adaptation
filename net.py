@@ -208,7 +208,7 @@ class VAE_Generator(nn.Module):
         feat_dim = kwargs.get("feat_dim", 120)
         self.downsample = nn.Sequential(
             ConvSample(inC=feat_dim, outC=feat_dim*2, k=3, s=1, p=1),
-            ConvSample(inC=feat_dim*2, outC=feat_dim*4 k=3, s=1, p=1)
+            ConvSample(inC=feat_dim*2, outC=feat_dim*4, k=3, s=1, p=1)
         )
         self.res = nn.ModuleList([
             # Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
