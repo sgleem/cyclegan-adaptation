@@ -39,7 +39,7 @@ lr_d = 0.00001
 change_epoch = 2000
 save_per_epoch = 5
 
-adv_coef = 1.0; spk_coef = 10.0; cyc_coef = 5.0; kl_coef = 1.0
+adv_coef = 1.0; spk_coef = 10.0; cyc_coef = 5.0; kl_coef = 1.0; con_coef = 10.0
 #####################################################################
 torch.cuda.empty_cache()
 os.system("mkdir -p "+ model_dir +"/parm")
@@ -195,7 +195,7 @@ for epoch in range(epochs):
         kl = kl_for_vae(meanA, stdA) + kl_for_vae(meanB, stdB)
 
         # Update Parameter
-        total = adv_coef * G_adv + spk_coef * G_spk + cyc_coef * cyc + kl_coef * kl + con_cyc
+        total = adv_coef * G_adv + spk_coef * G_spk + cyc_coef * cyc + kl_coef * kl + con_coef* con_cyc
         for opt in [E_opt, S_opt, G_opt]:
             opt.zero_grad()
         total.backward()
