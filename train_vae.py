@@ -141,13 +141,13 @@ for epoch in range(epochs):
         conA = VAE_E(xA); meanB, stdB, spkB = VAE_S(iB); A2B = VAE_G(conA, spkB)
         conB = VAE_E(xB); meanA, stdA, spkA = VAE_S(iA); B2A = VAE_G(conB, spkA)
         
-        ansxA, ansxA = VAE_D(xA)
-        ansxB, ansxB = VAE_D(xB)
-        ansA2B, ansA2B = VAE_D(A2B)
-        ansB2A, ansB2A = VAE_D(B2A)
+        ansxA, spkxA = VAE_D(xA)
+        ansxB, spkxB = VAE_D(xB)
+        ansA2B, spkA2B = VAE_D(A2B)
+        ansB2A, spkB2A = VAE_D(B2A)
 
         D_adv = l2loss(ansxA, 1) / 2 + l2loss(ansxB, 1) / 2 + l2loss(ansA2B, 0) / 2 + l2loss(ansB2A, 0) / 2 
-        D_spk = nllloss(ansxA, tA) + nllloss(ansxB, tB) + nllloss(ansA2B, tA) + nllloss(ansB2A, tB)
+        D_spk = nllloss(spkxA, tA) + nlllossspkxB, tB) + nllloss(spkA2B, tA) + nllloss(spkB2A, tB)
 
         # Update Parameter
         total = adv_coef * D_adv + spk_coef * D_spk
