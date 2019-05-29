@@ -241,7 +241,7 @@ class VAE_Generator(nn.Module):
 
 class VAE_Discriminator(nn.Module):
     """
-    (N, 128, 120) -> (N, 1, 128, 120) -> (N, 4, 64, 60) -> (N, 16, 32, 30)
+    (N, 128, 120) -> (N, 1, 128, 120) -> (N, 4, 64, 60) -> (N, 16, 32, 30) -> (N, 32, 16, 15)
     -> (N, 128*120 -> 512 -> 512 -> 1 & 283)
     """
     def __init__(self, *args, **kwargs):
@@ -253,11 +253,11 @@ class VAE_Discriminator(nn.Module):
 
         self.downsample = nn.Sequential(
             ConvSample2D(inC=1, outC=4, k=4, s=2, p=1),
-            ConvSample2D(inC=4, outC=16, k=4, s=2, p=1)
+            ConvSample2D(inC=4, outC=16, k=4, s=2, p=1),
+            ConvSample2D(inC=16, outC=32, k=4, s=2, p=1)
         )
         self.mlp = nn.Sequential(
-            ReLU(input_dim=feat_dim*128, output_dim=hidden_dim, batch_norm=False, dropout=0),
-            ReLU(input_dim=hidden_dim, output_dim=hidden_dim, batch_norm=False, dropout=0)
+            ReLU(input_dim=feat_dim*128, output_dim=hidden_dim, batch_norm=True, dropout=0)
         )
         self.tf = nn.Linear(hidden_dim, 1)
         self.spk = nn.Linear(hidden_dim, spk_dim)

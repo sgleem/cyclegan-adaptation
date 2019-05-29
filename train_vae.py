@@ -97,7 +97,7 @@ for model in [VAE_E, VAE_S, VAE_G, VAE_D]:
     model.cuda()
 
 lm = LogManager()
-for stype in ["D_adv", "D_spk", "G_adv", "G_spk", "cyc", "KL"]:
+for stype in ["D_adv", "D_spk", "G_adv", "G_spk", "cyc", "content", "KL"]:
     lm.alloc_stat_type(stype)
 
 torch.save(VAE_E, model_dir+"/init.pt")
@@ -140,13 +140,13 @@ for epoch in range(epochs):
         conA = VAE_E(xA); meanB, stdB, spkB = VAE_S(iB); A2B = VAE_G(conA, spkB)
         conB = VAE_E(xB); meanA, stdA, spkA = VAE_S(iA); B2A = VAE_G(conB, spkA)
         
-        ansT1, ansA1 = VAE_D(xA)
-        ansT2, ansB1 = VAE_D(xB)
-        ansF1, ansA2 = VAE_D(A2B)
-        ansF2, ansB2 = VAE_D(B2A)
+        ansxA, ansxA = VAE_D(xA)
+        ansxB, ansxB = VAE_D(xB)
+        ansA2B, ansA2B = VAE_D(A2B)
+        ansB2A, ansB2A = VAE_D(B2A)
 
-        D_adv = l2loss(ansT1, 1) / 2 + l2loss(ansT2, 1) / 2 + l2loss(ansF1, 0) / 2 + l2loss(ansF2, 0) / 2 
-        D_spk = nllloss(ansA1, tA) + nllloss(ansB1, tB) + nllloss(ansA2, tA) + nllloss(ansB2, tB)
+        D_adv = l2loss(ansxA, 1) / 2 + l2loss(ansxB, 1) / 2 + l2loss(ansA2B, 0) / 2 + l2loss(ansB2A, 0) / 2 
+        D_spk = nllloss(ansxA, tA) + nllloss(ansxB, tB) + nllloss(ansA2B, tA) + nllloss(ansB2A, tB)
 
         # Update Parameter
         total = adv_coef * D_adv + spk_coef * D_spk
@@ -180,21 +180,22 @@ for epoch in range(epochs):
         conA = VAE_E(xA); meanB, stdB, spkB = VAE_S(iB); A2B = VAE_G(conA, spkB)
         conB = VAE_E(xB); meanA, stdA, spkA = VAE_S(iA); B2A = VAE_G(conB, spkA)
         
-        ansT1, ansB1 = VAE_D(A2B)
-        ansT2, ansA1 = VAE_D(B2A)
+        ansA2B, spkA2B = VAE_D(A2B)
+        ansB2A, spkB2A = VAE_D(B2A)
 
-        G_adv = l2loss(ansT1, 1) / 2 + l2loss(ansT2, 1) / 2
-        G_spk = nllloss(ansA1, tA) + nllloss(ansB1, tB)
+        G_adv = l2loss(ansA2B, 1) / 2 + l2loss(ansB2A, 1) / 2
+        G_spk = nllloss(ansB2A, tA) + nllloss(ansA2B, tB)
 
         # phase 2: A2B -> A2B2A
         conA2B = VAE_E(A2B); A2B2A = VAE_G(conA2B, spkA)
         conB2A = VAE_E(B2A); B2A2B = VAE_G(conB2A, spkB)
 
         cyc = l1loss(A2B2A, xA) + l1loss(B2A2B, xB)
+        con_cyc = l1loss(conA2B, conA) + l1loss(conB2A, conB)
         kl = kl_for_vae(meanA, stdA) + kl_for_vae(meanB, stdB)
 
         # Update Parameter
-        total = adv_coef * G_adv + spk_coef * G_spk + cyc_coef * cyc + kl_coef * kl
+        total = adv_coef * G_adv + spk_coef * G_spk + cyc_coef * cyc + kl_coef * kl + con_cyc
         for opt in [E_opt, S_opt, G_opt]:
             opt.zero_grad()
         total.backward()
@@ -205,6 +206,7 @@ for epoch in range(epochs):
         lm.add_torch_stat("G_adv", G_adv)
         lm.add_torch_stat("G_spk", G_spk)
         lm.add_torch_stat("cyc", cyc)
+        lm.add_torch_stat("content", con_cyc)
         lm.add_torch_stat("KL", kl)
 
     # Print total log of train phase
@@ -248,12 +250,14 @@ for epoch in range(epochs):
             conB2A = VAE_E(B2A); B2A2B = VAE_G(conB2A, spkB)
 
             cyc = l1loss(A2B2A, xA) + l1loss(B2A2B, xB)
+            con_cyc = l1loss(conA2B, conA) + l1loss(conB2A, conB)
             kl = kl_for_vae(meanA, stdA) + kl_for_vae(meanB, stdB)
 
             # Save to Log
             lm.add_torch_stat("D_adv", D_adv)
             lm.add_torch_stat("G_adv", G_adv)
             lm.add_torch_stat("cyc", cyc)
+            lm.add_torch_stat("content", con_cyc)
             lm.add_torch_stat("KL", kl)
 
     # Print total log of train phase
