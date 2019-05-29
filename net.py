@@ -247,6 +247,7 @@ class VAE_Discriminator(nn.Module):
     def __init__(self, *args, **kwargs):
         super(VAE_Discriminator, self).__init__()
         feat_dim = kwargs.get("feat_dim", 120)
+        frame_dim = kwargs.get("frame_dim", 128)
         hidden_dim = kwargs.get("hidden_dim", 512)
         spk_dim = kwargs.get("spk_dim", 283)
         self.spk_dim = spk_dim
@@ -257,7 +258,8 @@ class VAE_Discriminator(nn.Module):
             ConvSample2D(inC=16, outC=64, k=4, s=2, p=1)
         )
         self.mlp = nn.Sequential(
-            ReLU(input_dim=feat_dim*128, output_dim=hidden_dim, batch_norm=False, dropout=0)
+            nn.Linear(feat_dim*frame_dim, hidden_dim),
+            nn.LeakyReLU()
         )
         self.tf = nn.Linear(hidden_dim, 1)
         self.spk = nn.Linear(hidden_dim, spk_dim)
