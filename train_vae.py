@@ -60,6 +60,7 @@ for dataset in [train_storage, dev_storage]:
 train_segs = pp.make_spk_cnn_set(train_storage, frame_size=frame_size, step_size=step_size); print(len(train_segs))
 dev_segs = pp.make_spk_cnn_set(dev_storage, frame_size=frame_size, step_size=step_size); print(len(dev_segs))
 spk_dim = len(train_segs.keys())
+print(spk_dim)
 
 train_set = []
 for spk_id, seg_set in train_segs.items():
@@ -158,6 +159,7 @@ for epoch in range(epochs):
         lm.add_torch_stat("D_adv", D_adv)
         lm.add_torch_stat("D_spk", D_spk)
     # G phase
+    count = 0
     for spk_ids, idxs in train_loader:
         total_len = len(spk_ids)
         if total_len % 2 == 0: # even
@@ -184,8 +186,8 @@ for epoch in range(epochs):
         ansB2A, spkB2A = VAE_D(B2A)
 
         G_adv = l2loss(ansA2B, 1) / 2 + l2loss(ansB2A, 1) / 2
-        G_spk = nllloss(ansB2A, tA) + nllloss(ansA2B, tB)
-
+        G_spk = nllloss(spkB2A, tA) + nllloss(spkA2B, tB)
+        
         # phase 2: A2B -> A2B2A
         conA2B = VAE_E(A2B); A2B2A = VAE_G(conA2B, spkA)
         conB2A = VAE_E(B2A); B2A2B = VAE_G(conB2A, spkB)
@@ -193,7 +195,7 @@ for epoch in range(epochs):
         cyc = l1loss(A2B2A, xA) + l1loss(B2A2B, xB)
         con_cyc = l1loss(conA2B, conA) + l1loss(conB2A, conB)
         kl = kl_for_vae(meanA, stdA) + kl_for_vae(meanB, stdB)
-
+        
         # Update Parameter
         total = adv_coef * G_adv + spk_coef * G_spk + cyc_coef * cyc + kl_coef * kl + con_coef* con_cyc
         for opt in [E_opt, S_opt, G_opt]:

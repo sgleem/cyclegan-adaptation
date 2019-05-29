@@ -230,9 +230,9 @@ class VAE_Generator(nn.Module):
         x = x.permute(0, 2, 1)
         h = self.downsample(x)
         spk = ivec.unsqueeze(dim=2).expand_as(h)
-        for res in self.res:
+        for r in self.res:
             # h = spk+h
-            h = res(h, spk)
+            h = r(h, spk)
         h = self.upsample(h)
         h = h.permute(0, 2, 1)
         out = self.out(h)
