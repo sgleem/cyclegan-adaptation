@@ -147,7 +147,7 @@ for epoch in range(epochs):
         ansB2A, spkB2A = VAE_D(B2A)
 
         D_adv = l2loss(ansxA, 1) / 2 + l2loss(ansxB, 1) / 2 + l2loss(ansA2B, 0) / 2 + l2loss(ansB2A, 0) / 2 
-        D_spk = nllloss(spkxA, tA) + nlllossspkxB, tB) + nllloss(spkA2B, tA) + nllloss(spkB2A, tB)
+        D_spk = nllloss(spkxA, tA) + nllloss(spkxB, tB) + nllloss(spkA2B, tA) + nllloss(spkB2A, tB)
 
         # Update Parameter
         total = adv_coef * D_adv + spk_coef * D_spk
