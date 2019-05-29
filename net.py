@@ -257,7 +257,7 @@ class VAE_Discriminator(nn.Module):
             ConvSample2D(inC=16, outC=64, k=4, s=2, p=1)
         )
         self.mlp = nn.Sequential(
-            ReLU(input_dim=feat_dim*128, output_dim=hidden_dim, batch_norm=True, dropout=0)
+            ReLU(input_dim=feat_dim*128, output_dim=hidden_dim, batch_norm=False, dropout=0)
         )
         self.tf = nn.Linear(hidden_dim, 1)
         self.spk = nn.Linear(hidden_dim, spk_dim)
