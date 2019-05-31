@@ -182,19 +182,17 @@ class VAE_Speaker(nn.Module):
             ReLU(input_dim=hidden_dim, output_dim=hidden_dim, batch_norm=True, dropout=0)
         )
         self.mean = nn.Sequential(
-            nn.Linear(hidden_dim, output_dim),
-            nn.Tanh()
+            nn.Linear(hidden_dim, output_dim)
         )
         self.logvar = nn.Sequential(
-            nn.Linear(hidden_dim, output_dim),
-            nn.Tanh()
+            nn.Linear(hidden_dim, output_dim)
         )
 
     def forward(self, x):
         h = self.mlp(x)
         m = self.mean(h)
         s = self.logvar(h)
-        out = torch.exp(s) * torch.randn_like(m) + m
+        out = torch.exp(s/2) * torch.randn_like(m) + m
         
         return m, s, out
 
@@ -206,6 +204,7 @@ class VAE_Generator(nn.Module):
     def __init__(self, *args, **kwargs):
         super(VAE_Generator, self).__init__()
         feat_dim = kwargs.get("feat_dim", 120)
+        aux_dim = kwargs.get("aux_dim", 480)
         self.downsample = nn.Sequential(
             ConvSample(inC=feat_dim, outC=feat_dim*2, k=3, s=1, p=1),
             ConvSample(inC=feat_dim*2, outC=feat_dim*4, k=3, s=1, p=1)
@@ -214,9 +213,9 @@ class VAE_Generator(nn.Module):
             # Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
             # Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
             # Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1)
-            Residual_Cat(inC=feat_dim*4, auxC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
-            Residual_Cat(inC=feat_dim*4, auxC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
-            Residual_Cat(inC=feat_dim*4, auxC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1)
+            Residual_Cat(mainC=feat_dim*4, auxC=aux_dim, hiddenC=feat_dim*8, k=3, s=1, p=1),
+            Residual_Cat(mainC=feat_dim*4, auxC=aux_dim, hiddenC=feat_dim*8, k=3, s=1, p=1),
+            Residual_Cat(mainC=feat_dim*4, auxC=aux_dim, hiddenC=feat_dim*8, k=3, s=1, p=1)
         ])
         self.upsample = nn.Sequential(
             ConvSample(inC=feat_dim*4, outC=feat_dim*2, k=3, s=1, p=1),
@@ -229,7 +228,7 @@ class VAE_Generator(nn.Module):
     def forward(self, x, ivec):
         x = x.permute(0, 2, 1)
         h = self.downsample(x)
-        spk = ivec.unsqueeze(dim=2).expand_as(h)
+        spk = ivec.unsqueeze(dim=2).expand(-1, -1, 128)
         for r in self.res:
             # h = spk+h
             h = r(h, spk)
@@ -241,7 +240,7 @@ class VAE_Generator(nn.Module):
 
 class VAE_Discriminator(nn.Module):
     """
-    (N, 128, 120) -> (N, 1, 128, 120) -> (N, 4, 64, 60) -> (N, 16, 32, 30) -> (N, 64, 16, 15)
+    (N, 128, 120) -> (N, 1, 128, 120) -> (N, 4, 64, 60) -> (N, 16, 32, 30) -> (N, 64, 16, 15) -> (N, 256, 8, 7) -> (N, 1024, 4, 3)
     -> (N, 128*120 -> 512 -> 512 -> 1 & 283)
     """
     def __init__(self, *args, **kwargs):
@@ -255,10 +254,12 @@ class VAE_Discriminator(nn.Module):
         self.downsample = nn.Sequential(
             ConvSample2D(inC=1, outC=4, k=4, s=2, p=1),
             ConvSample2D(inC=4, outC=16, k=4, s=2, p=1),
-            ConvSample2D(inC=16, outC=64, k=4, s=2, p=1)
+            ConvSample2D(inC=16, outC=64, k=4, s=2, p=1),
+            ConvSample2D(inC=64, outC=256, k=4, s=2, p=1),
+            ConvSample2D(inC=256, outC=1024, k=4, s=2, p=1)
         )
         self.mlp = nn.Sequential(
-            nn.Linear(feat_dim*frame_dim, hidden_dim),
+            nn.Linear(12288, hidden_dim),
             nn.LeakyReLU()
         )
         self.tf = nn.Linear(hidden_dim, 1)

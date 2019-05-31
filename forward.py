@@ -11,7 +11,7 @@ from tool.kaldi import kaldi_io as kio
 from tool.kaldi.kaldi_manager import read_feat
 #####################################################################
 parser = argparse.ArgumentParser()
-parser.add_argument("--data_dir", default="data/wsj/test", type=str)
+parser.add_argument("--data_dir", default="data/timit/test", type=str)
 parser.add_argument("--si_dir", default="model/gru_wsj", type=str)
 parser.add_argument("--sa_dir", default="", type=str)
 args = parser.parse_args()
@@ -42,8 +42,6 @@ if sa_dir is not "":
     model_sa.cuda()
     model_sa.eval()
     print(model_sa)
-
-print(model_sa)
 
 kaldi_fp = kio.open_or_fd(si_dir+"/decode/lld.ark", 'wb')
 with torch.no_grad():

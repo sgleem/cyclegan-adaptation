@@ -73,11 +73,11 @@ class Residual(nn.Module):
 class Residual_Cat(nn.Module):
     def __init__(self, *args, **kwargs):
         super(Residual_Cat, self).__init__()
-        inC = kwargs.get("inC", 512)
-        auxC = kwargs.get("auxC", 512)
+        mainC = kwargs.get("mainC", 512)
+        auxC = kwargs.get("auxC", 100)
         outC = kwargs.get("hiddenC", 1024)
-        resC = inC
-        inC = inC + auxC
+
+        inC = mainC + auxC
 
         k = kwargs.get("k", 3)
         s = 1
@@ -88,8 +88,8 @@ class Residual_Cat(nn.Module):
         self.gate = nn.Conv1d(inC, outC, kernel_size=k, stride=s, padding=p)
         self.gate_norm = nn.InstanceNorm1d(outC)
 
-        self.cnn2 = nn.Conv1d(outC, resC, kernel_size=k, stride=s, padding=p)
-        self.cnn2_norm = nn.InstanceNorm1d(inC)
+        self.cnn2 = nn.Conv1d(outC, mainC, kernel_size=k, stride=s, padding=p)
+        self.cnn2_norm = nn.InstanceNorm1d(mainC)
     def forward(self, inX, auX):
         x = torch.cat((inX, auX), dim=1)
         h1 = self.cnn1(x); h1_norm = self.cnn1_norm(h1)

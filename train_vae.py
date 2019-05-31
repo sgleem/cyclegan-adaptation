@@ -27,7 +27,8 @@ train_dir = args.train_dir
 dev_dir = args.dev_dir
 model_dir = args.model_dir
 #####################################################################
-epochs = 1000
+vae_epochs = 50
+cyc_epochs = 1000
 batch_size = 2
 frame_size = 128
 step_size = 64
@@ -39,7 +40,7 @@ lr_d = 0.00001
 change_epoch = 2000
 save_per_epoch = 5
 
-adv_coef = 1.0; spk_coef = 10.0; cyc_coef = 5.0; kl_coef = 1.0; con_coef = 10.0
+adv_coef = 1.0; spk_coef = 10.0; cyc_coef = 5.0; kl_coef = 0.001; con_coef = 1.0
 #####################################################################
 torch.cuda.empty_cache()
 os.system("mkdir -p "+ model_dir +"/parm")
@@ -51,16 +52,15 @@ dev_storage = read_feat(dev_dir+"/feats.ark", delta=True)
 train_ivecs = read_vec(train_dir+"/ivectors.ark")
 dev_ivecs = read_vec(dev_dir+"/ivectors.ark")
 
-for dataset in [train_storage, dev_storage]:
-    for utt_id, feat_mat in dataset.items():
-        feat_mat = pp.matrix_normalize(feat_mat, axis=1, fcn_type="mean")
-        dataset[utt_id] = feat_mat
+# for dataset in [train_storage, dev_storage]:
+#     for utt_id, feat_mat in dataset.items():
+#         feat_mat = pp.matrix_normalize(feat_mat, axis=1, fcn_type="mean")
+#         dataset[utt_id] = feat_mat
 
 # {spk_id:[segment(128*120)1, seg2, seg3, ...]}
 train_segs = pp.make_spk_cnn_set(train_storage, frame_size=frame_size, step_size=step_size); print(len(train_segs))
 dev_segs = pp.make_spk_cnn_set(dev_storage, frame_size=frame_size, step_size=step_size); print(len(dev_segs))
 spk_dim = len(train_segs.keys())
-print(spk_dim)
 
 train_set = []
 for spk_id, seg_set in train_segs.items():
@@ -83,7 +83,6 @@ VAE_S = net.VAE_Speaker(feat_dim=100, hidden_dim=512, output_dim=480)
 VAE_G = net.VAE_Generator(feat_dim=120)
 VAE_D = net.VAE_Discriminator(feat_dim=120, hidden_dim=512, spk_dim=spk_dim)
 
-
 E_opt = optim.Adam(VAE_E.parameters(), lr=lr_e)
 S_opt = optim.Adam(VAE_S.parameters(), lr=lr_g)
 G_opt = optim.Adam(VAE_G.parameters(), lr=lr_g)
@@ -96,20 +95,122 @@ D_sch = scheduler.StepLR(D_opt, step_size=100, gamma=0.5)
 
 for model in [VAE_E, VAE_S, VAE_G, VAE_D]:
     model.cuda()
+torch.save(VAE_E, model_dir+"/init.pt")
 
+# VAE Phase
+print("VAE phase")
+lm = LogManager()
+for stype in ["D_adv", "D_spk", "G_adv", "G_spk", "recon", "KL"]:
+    lm.alloc_stat_type(stype)
+for epoch in range(vae_epochs):
+    print("EPOCH :", epoch)
+    # Train
+    lm.init_stat()
+    for model in [VAE_E, VAE_S, VAE_G, VAE_D]:
+        model.train()
+    # D & SPK phase
+    for spk_ids, idxs in train_loader:
+        x = [train_segs[spk_id][idx] for spk_id, idx in zip(spk_ids, idxs)]; x = torch.Tensor(x).float().cuda() # (batch_size, 128, 120)
+        ivec = [train_ivecs[spk_id] for spk_id in spk_ids]; ivec = torch.Tensor(ivec).float().cuda() # (batch_size, 100)
+        t = [train_spkidx[spk_id] for spk_id in spk_ids]; t = torch.Tensor(t).long().cuda() # (batch_size)
+        
+        m, s, ivecx = VAE_S(ivec)
+        
+        conx = VAE_E(x)
+        x2x = VAE_G(conx, ivecx)
+        
+        ansx, spkx = VAE_D(x)
+        ansx2x, spkx2x = VAE_D(x2x)
+    
+        D_adv = torch.mean(ansx2x) - torch.mean(ansx)
+        D_spk = nllloss(spkx, t)
+
+        # Update Parameter
+        total = adv_coef * D_adv + spk_coef * D_spk
+        D_opt.zero_grad()
+        total.backward()
+        D_opt.step()
+
+        # Save to Log
+        lm.add_torch_stat("D_adv", D_adv)
+        lm.add_torch_stat("D_spk", D_spk)
+    # G phase
+    for spk_ids, idxs in train_loader:
+        x = [train_segs[spk_id][idx] for spk_id, idx in zip(spk_ids, idxs)]; x = torch.Tensor(x).float().cuda() # (batch_size, 128, 120)
+        ivec = [train_ivecs[spk_id] for spk_id in spk_ids]; ivec = torch.Tensor(ivec).float().cuda() # (batch_size, 100)
+        t = [train_spkidx[spk_id] for spk_id in spk_ids]; t = torch.Tensor(t).long().cuda() # (batch_size)
+        
+        m, s, ivecx = VAE_S(ivec)
+        
+        conx = VAE_E(x)
+        x2x = VAE_G(conx, ivecx)
+        
+        ansx, spkx = VAE_D(x)
+        ansx2x, spkx2x = VAE_D(x2x)
+    
+        G_adv = torch.mean(ansx) - torch.mean(ansx2x)
+        G_spk = nllloss(spkx2x, t)
+        recon = l1loss(x2x, x)
+        kl = kl_for_vae(m, s)
+
+        # Update Parameter
+        total = adv_coef * G_adv + cyc_coef *recon + kl_coef * kl + spk_coef * G_spk
+        for opt in [E_opt, S_opt, G_opt]:
+            opt.zero_grad()
+        total.backward()
+        for opt in [E_opt, S_opt, G_opt]:
+            opt.step()
+
+        # Save to Log
+        lm.add_torch_stat("G_adv", G_adv)
+        lm.add_torch_stat("G_spk", G_spk)
+        lm.add_torch_stat("recon", recon)
+        lm.add_torch_stat("KL", kl)
+    # Print total log of train phase
+    print("Train G > \n\t", end='')
+    lm.print_stat()
+    # Eval
+    lm.init_stat()
+    for model in [VAE_E, VAE_S, VAE_G, VAE_D]:
+        model.eval()
+    with torch.no_grad():
+        for spk_ids, idxs in dev_loader:
+            x = [dev_segs[spk_id][idx] for spk_id, idx in zip(spk_ids, idxs)]; x = torch.Tensor(x).float().cuda() # (batch_size, 128, 120)
+            ivec = [dev_ivecs[spk_id] for spk_id in spk_ids]; ivec = torch.Tensor(ivec).float().cuda() # (batch_size, 100)
+            m, s, ivecx = VAE_S(ivec)
+        
+            conx = VAE_E(x)
+            x2x = VAE_G(conx, ivecx)
+            
+            ansx, spkx = VAE_D(x)
+            ansx2x, spkx2x = VAE_D(x2x)
+
+            D_adv = torch.mean(ansx2x) - torch.mean(ansx)
+            G_adv = torch.mean(ansx) - torch.mean(ansx2x)
+            recon = l1loss(x2x, x)
+            kl = kl_for_vae(m, s)
+
+            # Save to Log
+            lm.add_torch_stat("D_adv", D_adv)
+            lm.add_torch_stat("G_adv", G_adv)
+            lm.add_torch_stat("recon", recon)
+            lm.add_torch_stat("KL", kl)
+
+    # Print total log of train phase
+    print("Eval > \n\t", end='')
+    lm.print_stat()
+    # Save per defined epoch
+    if int(epoch % save_per_epoch) == 0:
+        parm_path = model_dir+"/parm/"+str(epoch)+"_vae.pt"
+        torch.save(VAE_E.state_dict(), parm_path)
+
+# Cycle Phase
+print("Cycle GAN phase")
 lm = LogManager()
 for stype in ["D_adv", "D_spk", "G_adv", "G_spk", "cyc", "content", "KL"]:
     lm.alloc_stat_type(stype)
 
-torch.save(VAE_E, model_dir+"/init.pt")
-
-# In train: get (spk_id, idx) * (batch_size * 2)
-# idxA = (batch_size, (spk_id, idx)); idxB = (batch_size, (spk_id, idx))
-# xA = [train_segs[spk_id, idx] for spk_id, idx in idxA]
-# iA = [train_ivecs[spk_id] for spk_id, idx in idxA]
-# tA = [train_spkidx[spk_id] for spk_id, idx in idxA]
-
-for epoch in range(epochs):
+for epoch in range(cyc_epochs):
     print("EPOCH :", epoch)
     # coefficient change
     if epoch >= change_epoch:
@@ -138,15 +239,21 @@ for epoch in range(epochs):
         tA = [train_spkidx[spk_id] for spk_id, idx in dA]; tA = torch.Tensor(tA).long().cuda() # (batch_size)
         tB = [train_spkidx[spk_id] for spk_id, idx in dB]; tB = torch.Tensor(tB).long().cuda() # (batch_size)
         
-        conA = VAE_E(xA); meanB, stdB, spkB = VAE_S(iB); A2B = VAE_G(conA, spkB)
-        conB = VAE_E(xB); meanA, stdA, spkA = VAE_S(iA); B2A = VAE_G(conB, spkA)
+        meanA, stdA, spkA = VAE_S(iA); meanB, stdB, spkB = VAE_S(iB) 
+        # spkA = iA; spkB = iB
+
+        conA = VAE_E(xA)
+        A2B = VAE_G(conA, spkB)
+        conB = VAE_E(xB)
+        B2A = VAE_G(conB, spkA)
         
         ansxA, spkxA = VAE_D(xA)
         ansxB, spkxB = VAE_D(xB)
         ansA2B, spkA2B = VAE_D(A2B)
         ansB2A, spkB2A = VAE_D(B2A)
 
-        D_adv = l2loss(ansxA, 1) / 2 + l2loss(ansxB, 1) / 2 + l2loss(ansA2B, 0) / 2 + l2loss(ansB2A, 0) / 2 
+        # D_adv = l2loss(ansxA, 1) / 2 + l2loss(ansxB, 1) / 2 + l2loss(ansA2B, 0) / 2 + l2loss(ansB2A, 0) / 2 
+        D_adv = torch.mean(ansA2B) - torch.mean(ansxA) + torch.mean(ansB2A) - torch.mean(ansxB)
         D_spk = nllloss(spkxA, tA) + nllloss(spkxB, tB) + nllloss(spkA2B, tA) + nllloss(spkB2A, tB)
 
         # Update Parameter
@@ -159,7 +266,6 @@ for epoch in range(epochs):
         lm.add_torch_stat("D_adv", D_adv)
         lm.add_torch_stat("D_spk", D_spk)
     # G phase
-    count = 0
     for spk_ids, idxs in train_loader:
         total_len = len(spk_ids)
         if total_len % 2 == 0: # even
@@ -179,13 +285,19 @@ for epoch in range(epochs):
         tB = [train_spkidx[spk_id] for spk_id, idx in dB]; tB = torch.Tensor(tB).long().cuda() # (batch_size)
         
         # phase 1: xA -> A2B
-        conA = VAE_E(xA); meanB, stdB, spkB = VAE_S(iB); A2B = VAE_G(conA, spkB)
-        conB = VAE_E(xB); meanA, stdA, spkA = VAE_S(iA); B2A = VAE_G(conB, spkA)
+        meanA, stdA, spkA = VAE_S(iA); meanB, stdB, spkB = VAE_S(iB) 
+        # spkA = iA; spkB = iB
+
+        conA = VAE_E(xA); A2B = VAE_G(conA, spkB)
+        conB = VAE_E(xB); B2A = VAE_G(conB, spkA)
         
+        ansxA, spkxA = VAE_D(xA)
+        ansxB, spkxB = VAE_D(xB)
         ansA2B, spkA2B = VAE_D(A2B)
         ansB2A, spkB2A = VAE_D(B2A)
 
-        G_adv = l2loss(ansA2B, 1) / 2 + l2loss(ansB2A, 1) / 2
+        # G_adv = l2loss(ansA2B, 1) / 2 + l2loss(ansB2A, 1) / 2
+        G_adv = torch.mean(ansxA) - torch.mean(ansA2B) + torch.mean(ansxB) - torch.mean(ansB2A)
         G_spk = nllloss(spkB2A, tA) + nllloss(spkA2B, tB)
         
         # phase 2: A2B -> A2B2A
@@ -197,7 +309,7 @@ for epoch in range(epochs):
         kl = kl_for_vae(meanA, stdA) + kl_for_vae(meanB, stdB)
         
         # Update Parameter
-        total = adv_coef * G_adv + spk_coef * G_spk + cyc_coef * cyc + kl_coef * kl + con_coef* con_cyc
+        total = adv_coef * G_adv + spk_coef * G_spk + cyc_coef * cyc + con_coef* con_cyc # + kl_coef * kl 
         for opt in [E_opt, S_opt, G_opt]:
             opt.zero_grad()
         total.backward()
@@ -236,16 +348,23 @@ for epoch in range(epochs):
             iB = [dev_ivecs[spk_id] for spk_id, idx in dB]; iB = torch.Tensor(iB).float().cuda() # (batch_size, 100)
             
             # phase 1: xA -> A2B
-            conA = VAE_E(xA); meanB, stdB, spkB = VAE_S(iB); A2B = VAE_G(conA, spkB)
-            conB = VAE_E(xB); meanA, stdA, spkA = VAE_S(iA); B2A = VAE_G(conB, spkA)
+            meanA, stdA, spkA = VAE_S(iA); meanB, stdB, spkB = VAE_S(iB) 
+            # spkA = iA; spkB = iB
+
+            conA = VAE_E(xA); A2B = VAE_G(conA, spkB)
+            conB = VAE_E(xB); B2A = VAE_G(conB, spkA)
             
             ansxA, _ = VAE_D(xA)
             ansxB, _ = VAE_D(xB)
             ansA2B, _ = VAE_D(A2B)
             ansB2A, _ = VAE_D(B2A)
 
-            D_adv = l2loss(ansxA, 1) / 2 + l2loss(ansxB, 1) / 2 + l2loss(ansA2B, 0) / 2 + l2loss(ansB2A, 0) / 2 
-            G_adv = l2loss(ansA2B, 1) / 2 + l2loss(ansB2A, 1) / 2
+            # D_adv = l2loss(ansxA, 1) / 2 + l2loss(ansxB, 1) / 2 + l2loss(ansA2B, 0) / 2 + l2loss(ansB2A, 0) / 2 
+            # G_adv = l2loss(ansA2B, 1) / 2 + l2loss(ansB2A, 1) / 2
+
+            
+            D_adv = torch.mean(ansA2B) - torch.mean(ansxA) + torch.mean(ansB2A) - torch.mean(ansxB)
+            G_adv = torch.mean(ansxA) - torch.mean(ansA2B) + torch.mean(ansxB) - torch.mean(ansB2A)
             
             # phase 2: A2B -> A2B2A
             conA2B = VAE_E(A2B); A2B2A = VAE_G(conA2B, spkA)

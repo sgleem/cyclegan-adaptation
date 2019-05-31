@@ -1,6 +1,6 @@
 #!/bin/bash
-#gmm_dir=gmm_hmm/timit
-gmm_dir=gmm_hmm/wsj
+gmm_dir=gmm_hmm/timit
+# gmm_dir=gmm_hmm/wsj
 
 data_dir=$1
 model_dir=$2
@@ -21,10 +21,10 @@ latgen-faster-mapped --min-active=200 --max-active=7000 \
     $gmm_dir/final.mdl $gmm_dir/graph/HCLG.fst "$lld" \
     "ark:|gzip -c > $model_dir/decode/lat.1.gz"
 
-#bash tool/score/timit/score.sh --cmd "$decode_cmd" \
-#    $data_dir $gmm_dir/graph $model_dir/decode
+bash tool/score/timit/score.sh --cmd "$decode_cmd" \
+   $data_dir $gmm_dir/graph $model_dir/decode
 
-bash tool/score/wsj/score.sh --cmd "$decode_cmd" \
-    $data_dir $gmm_dir/graph $model_dir/decode
+# bash tool/score/wsj/score.sh --cmd "$decode_cmd" \
+    # $data_dir $gmm_dir/graph $model_dir/decode
 
 bash tool/score/result.sh $model_dir
