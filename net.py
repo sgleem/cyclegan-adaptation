@@ -24,16 +24,18 @@ class GRU_HMM(nn.Module):
         out = F.log_softmax(out, dim=1)
         return out
 
-class FDLR(nn.Module):
+class ivecNN(nn.Module):
     def __init__(self, *args, **kwargs):
-        super(FDLR, self).__init__()
-        feat_dim = kwargs.get("feat_dim", 120)
+        super(ivecNN, self).__init__()
+        ivec_dim = kwargs.get("ivec_dim", 100)
         hidden_dim = kwargs.get("hidden_dim", 512)
-        num_layers = kwargs.get("num_layers", 2)
+        out_dim = kwargs.get("out_dim", 120)
 
-        self.MLP = nn.Linear(feat_dim, feat_dim)
-        self.MLP.weight = torch.nn.Parameter(torch.eye(feat_dim))
-        self.MLP.bias = torch.nn.Parameter(torch.zeros(feat_dim))
+        self.MLP = nn.Sequential(
+            nn.Linear(ivec_dim, hidden_dim), nn.LeakyReLU(),
+            nn.Linear(hidden_dim, hidden_dim), nn.LeakyReLU(),
+            nn.Linear(hidden_dim, out_dim)
+        )
 
     def forward(self, x):
         x_ = self.MLP(x)
