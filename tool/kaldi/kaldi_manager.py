@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #coding=utf8
-
+import os
 import numpy as np
 from . import kaldi_io
 from . import kaldi_command as kc
@@ -15,6 +15,10 @@ class KaldiReadManager:
         self.cmd_book = dict()
         self.init_command()
         self.init_command_book()
+    
+    def run(self):
+        self.cmd = self.cmd[:-1] # delete |
+        os.system(self.cmd)
 
     def init_command_book(self):
         """ need to fix
@@ -23,6 +27,7 @@ class KaldiReadManager:
         self.cmd_book["copy-feats"] = kc.copy_feats
         self.cmd_book["copy-vector"] = kc.copy_vector
         self.cmd_book["apply-cmvn"] = kc.apply_cmvn
+        self.cmd_book["compute-cmvn-stats"] = kc.compute_cmvn_stats
         self.cmd_book["add-deltas"] = kc.add_deltas
         self.cmd_book["splice-feats"] = kc.splice_feats
         self.cmd_book["gunzip"] = kc.gunzip
@@ -53,9 +58,15 @@ class KaldiReadManager:
 
 def read_feat(feat_path, cmvn=True, delta=True):
     km = KaldiReadManager()
+    
+    if cmvn:
+        km.set_command("compute-cmvn-stats", feat_path=feat_path, out_path="cmvn.ark")
+        km.run()
+    
+    km.init_command()
     km.set_command("copy-feats", feat_path)
     if cmvn:
-        km.set_command("apply-cmvn")
+        km.set_command("apply-cmvn", cmvn_path="cmvn.ark")
     if delta:
         km.set_command("add-deltas")
     feat_dict = km.read_to_mat()

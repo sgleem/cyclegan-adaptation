@@ -16,11 +16,11 @@ from tool.kaldi.kaldi_manager import read_feat, read_ali
 
 #####################################################################
 parser = argparse.ArgumentParser()
-parser.add_argument("--train_feat_dir", default="data/wsj/train", type=str)
-parser.add_argument("--train_ali_dir", default="ali/wsj/train", type=str)
-parser.add_argument("--dev_feat_dir", default="data/wsj/dev", type=str)
-parser.add_argument("--dev_ali_dir", default="ali/wsj/dev", type=str)
-parser.add_argument("--model_dir", default="model/gru_wsj_norm", type=str)
+parser.add_argument("--train_feat_dir", default="data/timit/train", type=str)
+parser.add_argument("--train_ali_dir", default="ali/timit/train", type=str)
+parser.add_argument("--dev_feat_dir", default="data/timit/dev", type=str)
+parser.add_argument("--dev_ali_dir", default="ali/timit/dev", type=str)
+parser.add_argument("--model_dir", default="model/ligru_timit", type=str)
 parser.add_argument("--rank", default=0, type=int)
 parser.add_argument("--size", default=1, type=int)
 args = parser.parse_args()

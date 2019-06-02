@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from module import ConvSample, Residual,Residual_Cat, ConvSample2D, ReLU
+from module import ConvSample, Residual,Residual_Cat, ConvSample2D, ReLU, liGRU
 
 class GRU_HMM(nn.Module):
     def __init__(self, *args, **kwargs):
@@ -12,8 +12,10 @@ class GRU_HMM(nn.Module):
         num_layers = kwargs.get("num_layers", 5)
         output_dim = kwargs.get("output_dim", 1920)
 
-        self.GRU = nn.GRU(input_size = input_dim, hidden_size = hidden_dim, 
-            num_layers=num_layers, dropout=0.2, bidirectional=True)
+        # self.GRU = nn.GRU(input_size = input_dim, hidden_size = hidden_dim, 
+        #     num_layers=num_layers, dropout=0.2, bidirectional=True)
+        self.GRU = liGRU(input_size = input_dim, hidden_size = hidden_dim, 
+            num_layers=num_layers, bidirectional=True)
         self.HMM = nn.Linear(hidden_dim * 2, output_dim)
         
     def forward(self, x):

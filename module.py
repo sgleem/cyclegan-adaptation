@@ -123,3 +123,90 @@ class ReLU(nn.Module):
             h = self.dropout(h)
         
         return h
+
+class liGRUCell(nn.Module):
+    def __init__(self, *args, **kwargs):
+        super(liGRUCell, self).__init__()
+        input_size = kwargs.get("input_size", 0)
+        output_size = kwargs.get("output_size", 0)
+
+        self.Wxz = nn.Linear(input_size, output_size, bias=True)
+        self.normWxz = nn.BatchNorm1d(output_size)
+        self.Whz = nn.Linear(output_size, output_size, bias=True)
+
+        self.Wxh = nn.Linear(input_size, output_size, bias=True)
+        self.normWxh = nn.BatchNorm1d(output_size)
+        self.Whh = nn.Linear(output_size, output_size, bias=True)
+
+    def forward(self, x, h_prev):
+        batch_size = x.size()[0]
+
+        if batch_size == 1:
+            Zt = self.Wxz(x) + self.Whz(h_prev)
+        else:
+            Zt = self.normWxz(self.Wxz(x)) + self.Whz(h_prev)
+        Zt = torch.sigmoid(Zt)
+
+        if batch_size == 1:
+            Ht = self.Wxh(x) + self.Whh(h_prev)
+        else:
+            Ht = self.normWxh(self.Wxh(x)) + self.Whh(h_prev)
+        Ht = nn.ReLU()(Ht)
+
+        h_out = Zt * h_prev + (1-Zt) * Ht
+        return h_out
+
+class liGRU(nn.Module):
+    def __init__(self, *args, **kwargs):
+        super(liGRU, self).__init__()
+        input_size = kwargs.get("input_size", 0)
+        hidden_size = kwargs.get("hidden_size", 0)
+        num_layers = kwargs.get("num_layers", 0)
+        self.bidirectional = kwargs.get("bidirectional", False)
+        input_hidden = hidden_size*2 if self.bidirectional else hidden_size
+
+        self.ligru_list = nn.ModuleList([])
+        self.ligru_list.append(liGRUCell(input_size=input_size, output_size=hidden_size))
+        if num_layers > 1:
+            for cur_layer in range(1, num_layers):
+                self.ligru_list.append(liGRUCell(input_size=input_hidden, output_size=hidden_size))
+        
+        self.init = torch.zeros(1, hidden_size).cuda()
+        
+    def forward(self, x, h_0=None):
+        batch_size = x.size()[1]
+        if h_0 is None:
+            h_0 = self.init.expand(batch_size, -1)
+        
+        h_history = None
+        for ligru in self.ligru_list:
+            next_x = None
+            h = h_0
+            for cur_x in x:
+                h_forward = ligru(cur_x, h)
+                cur_h = torch.unsqueeze(h_forward, dim=0)
+                next_x = cur_h if next_x is None else torch.cat((next_x, cur_h),dim=0)
+                h = h_forward
+            # save last hidden state
+            h_history = cur_h if h_history is None else torch.cat((h_history, cur_h),dim=0)
+
+            if self.bidirectional:
+                back_x = None
+                h = h_0
+                x_back = torch.flip(x, dims=[0]) # sequence reverse
+                for cur_x in x_back:
+                    h_backward = ligru(cur_x, h)
+                    cur_h = torch.unsqueeze(h_backward, dim=0)
+                    back_x = cur_h if back_x is None else torch.cat((back_x, cur_h),dim=0)
+                    h = h_backward
+                # save last hidden state
+                h_history = torch.cat((h_history, cur_h),dim=0)
+                next_x = torch.cat((next_x, back_x),dim=2)
+
+            x = next_x
+        
+        return x, h_history
+
+
+
+
