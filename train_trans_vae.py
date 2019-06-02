@@ -37,7 +37,7 @@ lr_g = 0.00002
 lr_d = 0.00001
 
 save_per_epoch = 5
-adv_coef = 1.0; spk_coef = 10.0; kl_coef = 0.001; cyc_coef=10.0
+adv_coef = 1.0; spk_coef = 10.0; kl_coef = 0.0001; cyc_coef=10.0; norm_coef = 0.0001
 #####################################################################
 torch.cuda.empty_cache()
 os.system("mkdir -p "+ model_dir +"/parm")
@@ -97,11 +97,11 @@ torch.save(VAE_E, model_dir+"/init.pt")
 # Train start
 print("Train start")
 lm = LogManager()
-for stype in ["D_adv", "D_spk", "G_adv", "G_spk", "cyc", "KL", "content"]:
+for stype in ["D_adv", "D_spk", "G_adv", "G_spk", "norm", "recon", "cyc", "KL", "content"]:
     lm.alloc_stat_type(stype)
 for epoch in range(epochs):
     print("EPOCH :", epoch)
-
+    
     # Domain Translation - Discriminator
     for spk_ids, idxs in train_loader:
         total_len = len(spk_ids)
@@ -139,7 +139,7 @@ for epoch in range(epochs):
         D_adv2 = torch.mean(tf_B2A) - torch.mean(tf_B)
         D_adv = D_adv1 + D_adv2
 
-        D_spk1 = nllloss(spk_A, tA) + nllloss(spk_B, tB)
+        D_spk1 = nllloss(spk_A, tA) + nllloss(spk_B, tB) 
         D_spk2 = nllloss(spk_A2B, tA) + nllloss(spk_B2A, tB)
         D_spk = D_spk1 + D_spk2
 
@@ -153,6 +153,52 @@ for epoch in range(epochs):
         # Save to Log
         lm.add_torch_stat("D_adv", D_adv)
         lm.add_torch_stat("D_spk", D_spk)
+
+    # Reconstruction
+    for spk_ids, idxs in train_loader:
+        total_len = len(spk_ids)
+        if total_len % 2 == 0: # even
+            start_A = 0; start_B = total_len//2
+            end_A = start_B; end_B = total_len
+        else: # odd
+            start_A = 0; start_B = total_len//2
+            end_A = start_B + 1; end_B = total_len
+
+        dA = [(spk_ids[i], idxs[i]) for i in range(start_A, end_A)]
+        dB = [(spk_ids[i], idxs[i]) for i in range(start_B, end_B)]
+        xA = [train_segs[spk_id][idx] for spk_id, idx in dA]; xA = torch.Tensor(xA).float().cuda() # (batch_size, 128, 120)
+        xB = [train_segs[spk_id][idx] for spk_id, idx in dB]; xB = torch.Tensor(xB).float().cuda() # (batch_size, 128, 120)
+        iA = [train_ivecs[spk_id] for spk_id, idx in dA]; iA = torch.Tensor(iA).float().cuda() # (batch_size, 100)
+        iB = [train_ivecs[spk_id] for spk_id, idx in dB]; iB = torch.Tensor(iB).float().cuda() # (batch_size, 100)
+        tA = [train_spkidx[spk_id] for spk_id, idx in dA]; tA = torch.Tensor(tA).long().cuda() # (batch_size)
+        tB = [train_spkidx[spk_id] for spk_id, idx in dB]; tB = torch.Tensor(tB).long().cuda() # (batch_size)
+
+        mxA, sxA = VAE_E(xA)
+        mxB, sxB = VAE_E(xB)
+
+        mxA2A = mTranslator(mxA, iA)
+        mxB2B = mTranslator(mxB, iB)
+
+        xA2A = VAE_G(mxA2A, sxA)
+        xB2B = VAE_G(mxB2B, sxB)
+
+        _, spk_mA = VAE_D(mxA)
+        _, spk_mB = VAE_D(mxB)
+
+        norm = -nllloss(spk_mA, tA) - nllloss(spk_mB, tB)
+        recon = l1loss(xA2A, xA) + l1loss(xB2B, xB)
+
+        total = norm_coef * norm + recon
+
+        for opt in [E_opt, m_opt, G_opt]:
+            opt.zero_grad()
+        total.backward()
+        for opt in [E_opt, m_opt, G_opt]:
+            opt.step()
+        # Save to Log
+        lm.add_torch_stat("norm", norm)
+        lm.add_torch_stat("recon", recon)
+
 
     # Domain Translation - Generator
     for spk_ids, idxs in train_loader:
@@ -191,7 +237,7 @@ for epoch in range(epochs):
         G_adv2 = torch.mean(tf_B) - torch.mean(tf_B2A)
         G_adv = G_adv1 + G_adv2
 
-        G_spk = nllloss(spk_A2B, tB) + nllloss(spk_B2A, tA)
+        G_spk = nllloss(spk_A2B, tB) + nllloss(spk_B2A, tA) 
 
         siA2B, stdA2B = VAE_E(xA2B)
         siB2A, stdB2A = VAE_E(xB2A)
