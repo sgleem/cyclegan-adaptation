@@ -60,7 +60,8 @@ with torch.no_grad():
         for utt_id, feat_mat in dataset.items():
             feat_mat = matrix_normalize(feat_mat, axis=1, fcn_type="mean")
             x = torch.Tensor([feat_mat]).cuda().float()
-            x = model_sa(x)[0].cpu().detach().numpy()
+            x, _ = model_sa(x)
+            x = x[0].cpu().detach().numpy()
             dataset[utt_id] = x
 print("Feature generation complete")
 

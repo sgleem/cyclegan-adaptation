@@ -40,7 +40,7 @@ lr_d = 0.00001
 change_epoch = 2000
 save_per_epoch = 5
 
-adv_coef = 1.0; spk_coef = 10.0; cyc_coef = 5.0; kl_coef = 0.001; con_coef = 1.0
+adv_coef = 1.0; spk_coef = 10.0; cyc_coef = 5.0; kl_coef = 0.01; con_coef = 1.0
 #####################################################################
 torch.cuda.empty_cache()
 os.system("mkdir -p "+ model_dir +"/parm")

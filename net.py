@@ -276,3 +276,93 @@ class VAE_Discriminator(nn.Module):
         spk = self.spk(h); spk = F.log_softmax(spk, dim=1)
         
         return tf, spk
+
+######### Translation VAE #########
+class VariationalEncoder(nn.Module):
+    """
+    (N, T, 120) -> (N , 120 -> 240 -> 480 -> 480 -> 480 -> 480 -> 240 -> 120, T) -> (N, T, 120)
+    """
+    def __init__(self, *args, **kwargs):
+        super(VariationalEncoder, self).__init__()
+        feat_dim = kwargs.get("feat_dim", 120)
+        self.cnn_encoder = nn.Sequential(
+            ConvSample(inC=feat_dim, outC=feat_dim*2, k=3, s=1, p=1),
+            ConvSample(inC=feat_dim*2, outC=feat_dim*4, k=3, s=1, p=1),
+            Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
+            Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
+            Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
+            ConvSample(inC=feat_dim*4, outC=feat_dim*2, k=3, s=1, p=1),
+            ConvSample(inC=feat_dim*2, outC=feat_dim, k=3, s=1, p=1)
+        )
+        self.mean = nn.Sequential(
+            nn.Linear(feat_dim, feat_dim),
+            nn.Tanh()
+        )
+        self.std = nn.Sequential(
+            nn.Linear(feat_dim, feat_dim),
+            nn.Tanh()
+        )
+
+    def forward(self, x):
+        x = x.permute(0, 2, 1)
+        h = self.cnn_encoder(x)
+        h = h.permute(0, 2, 1)
+        m = self.mean(h)
+        s = self.std(h)
+        
+        return m, s
+
+class VariationalDecoder(nn.Module):
+    """
+    (N, T, 120), (N, T, 120) => (N, T, 120) 
+        -> (N , 120 -> 240 -> 480 -> 480 -> 480 -> 480 -> 240 -> 120, T) -> (N, T, 120)
+    """
+    def __init__(self, *args, **kwargs):
+        super(VariationalDecoder, self).__init__()
+        feat_dim = kwargs.get("feat_dim", 120)
+        self.cnn_encoder = nn.Sequential(
+            ConvSample(inC=feat_dim, outC=feat_dim*2, k=3, s=1, p=1),
+            ConvSample(inC=feat_dim*2, outC=feat_dim*4, k=3, s=1, p=1),
+            Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
+            Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
+            Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
+            ConvSample(inC=feat_dim*4, outC=feat_dim*2, k=3, s=1, p=1),
+            ConvSample(inC=feat_dim*2, outC=feat_dim, k=3, s=1, p=1)
+        )
+        self.out = nn.Linear(feat_dim, feat_dim)
+        
+    def forward(self, m, s):
+        x = torch.exp(s/2) * torch.randn_like(m) + m
+        x = x.permute(0, 2, 1)
+        h = self.cnn_encoder(x)
+        h = h.permute(0, 2, 1)
+        out = self.out(h)
+        
+        return out
+
+class MeanTranslator(nn.Module):
+    """
+    (N, T, 120) + (N, 100) -> (N, T, 120) + (N, 1->T, 100) 
+        -> (N, T, 220) -> (N, T, 220->512->512->120)
+    """
+    def __init__(self, *args, **kwargs):
+        super(MeanTranslator, self).__init__()
+        feat_dim = kwargs.get("feat_dim", 120)
+        hidden_dim = kwargs.get("hidden_dim", 512)
+        ivec_dim = kwargs.get("ivec_dim", 100)
+
+        input_dim = feat_dim + ivec_dim
+
+        self.x_var = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim), nn.LeakyReLU(),
+            nn.Linear(hidden_dim, hidden_dim), nn.LeakyReLU(),
+            nn.Linear(hidden_dim, feat_dim)
+        )
+
+    def forward(self, x, ivec):
+        ivec = ivec.unsqueeze(dim=1).expand(-1, 128, -1)
+        inp = torch.cat((x,ivec), dim=2)
+        var = self.x_var(inp)
+        sa_x = x + var
+        return sa_x
+
