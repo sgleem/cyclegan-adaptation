@@ -51,11 +51,11 @@ class KaldiReadManager:
         result = {utt_id: np.array(vec) for utt_id, vec in generator}
         return result
 
-def read_feat(feat_path, cmvn_path="", u2s_path="", delta=True):
+def read_feat(feat_path, cmvn=True, delta=True):
     km = KaldiReadManager()
     km.set_command("copy-feats", feat_path)
-    if cmvn_path is not "" and u2s_path is not "":
-        km.set_command("apply-cmvn", u2s_path, cmvn_path)
+    if cmvn:
+        km.set_command("apply-cmvn")
     if delta:
         km.set_command("add-deltas")
     feat_dict = km.read_to_mat()

@@ -42,17 +42,12 @@ adv_coef = 1.0; spk_coef = 10.0; kl_coef = 0.0001; cyc_coef=10.0; norm_coef = 0.
 torch.cuda.empty_cache()
 os.system("mkdir -p "+ model_dir +"/parm")
 
-train_storage = read_feat(train_dir+"/feats.ark", delta=True)
-dev_storage = read_feat(dev_dir+"/feats.ark", delta=True)
+train_storage = read_feat(train_dir+"/feats.ark", cmvn=True, delta=True)
+dev_storage = read_feat(dev_dir+"/feats.ark", cmvn=True, delta=True)
 
 # read ivector into {spk_id:ivector} 
 train_ivecs = read_vec(train_dir+"/ivectors.ark")
 dev_ivecs = read_vec(dev_dir+"/ivectors.ark")
-
-for dataset in [train_storage, dev_storage]:
-    for utt_id, feat_mat in dataset.items():
-        feat_mat = pp.matrix_normalize(feat_mat, axis=1, fcn_type="mean")
-        dataset[utt_id] = feat_mat
 
 # {spk_id:[segment(128*120)1, seg2, seg3, ...]}
 train_segs = pp.make_spk_cnn_set(train_storage, frame_size=frame_size, step_size=step_size); print(len(train_segs))

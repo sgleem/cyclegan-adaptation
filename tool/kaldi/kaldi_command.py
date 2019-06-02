@@ -31,16 +31,14 @@ def copy_vector(vec_path="-", out_path="-"):
     result_cmd=make_kaldi_cmd(kaldi_cmd, r_specifier, o_specifier)
     return result_cmd
 
-def apply_cmvn(u2s_path, cmvn_path, feat_path="-", out_path="-"):
+def apply_cmvn(feat_path="-", out_path="-"):
     """
-    apply-cmvn <--utt2spk=ark:utt2spk> <scp:cmvn.scp> <ark:feats.scp> <ark:-> |
+    apply-cmvn <ark:feats.scp> <ark:-> |
     """
     kaldi_cmd="apply-cmvn"
-    u2s="--utt2spk="+get_specifier(u2s_path)
-    r_specifier1=get_specifier(cmvn_path)
-    r_specifier2=get_specifier(feat_path)
+    r_specifier=get_specifier(feat_path)
     o_specifier=get_specifier(out_path)
-    result_cmd=make_kaldi_cmd(kaldi_cmd, u2s, r_specifier1, r_specifier2, o_specifier)
+    result_cmd=make_kaldi_cmd(kaldi_cmd, u2s, r_specifier, o_specifier)
     return result_cmd
 def add_deltas(feat_path="-", out_path="-"):
     """

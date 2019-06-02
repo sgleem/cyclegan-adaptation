@@ -38,8 +38,8 @@ pdf_num = 3424
 os.system("mkdir -p " + model_dir + "/parm")
 os.system("mkdir -p " + model_dir + "/opt")
 
-train_feat = read_feat(train_feat_dir+"/feats.ark", delta=True)
-dev_feat = read_feat(dev_feat_dir+"/feats.ark", delta=True)
+train_feat = read_feat(train_feat_dir+"/feats.ark", cmvn=True, delta=True)
+dev_feat = read_feat(dev_feat_dir+"/feats.ark", cmvn=True, delta=True)
 
 train_ali = read_ali(train_ali_dir+"/ali.*.gz", train_ali_dir+"/final.mdl")
 dev_ali = read_ali(dev_ali_dir+"/ali.*.gz", dev_ali_dir+"/final.mdl")
@@ -56,11 +56,6 @@ model_sch = sch.ReduceLROnPlateau(model_opt, factor=0.5, patience=0, verbose=Tru
 lm = LogManager()
 lm.alloc_stat_type_list(["train_loss","train_acc","dev_loss","dev_acc"])
 
-# preprocess
-for dataset in [train_feat, dev_feat]:
-    for utt_id, feat_mat in dataset.items():
-        feat_mat = pp.matrix_normalize(feat_mat, axis=1, fcn_type="mean")
-        dataset[utt_id] = feat_mat
 # prior calculation
 prior = np.zeros(pdf_num)
 for align in train_ali.values():
