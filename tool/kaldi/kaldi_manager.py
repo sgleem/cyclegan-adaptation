@@ -56,7 +56,7 @@ class KaldiReadManager:
         result = {utt_id: np.array(vec) for utt_id, vec in generator}
         return result
 
-def read_feat(feat_path, cmvn=True, delta=True):
+def read_feat(feat_path, cmvn=False, delta=True):
     km = KaldiReadManager()
     
     if cmvn:

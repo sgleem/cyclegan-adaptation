@@ -24,7 +24,8 @@ sa_dir = args.sa_dir
 os.system("mkdir -p " + si_dir + "/decode")
 
 # data
-test_feat = read_feat(data_dir+"/feats.ark", cmvn=True, delta=True)
+# test_feat = read_feat(data_dir+"/feats.ark", cmvn=True, delta=True)
+test_feat = read_feat(data_dir+"/feats.ark", delta=True)
 
 # prior
 with open(si_dir+"/prior.pk", 'rb') as f:
@@ -46,11 +47,13 @@ if sa_dir is not "":
 kaldi_fp = kio.open_or_fd(si_dir+"/decode/lld.ark", 'wb')
 with torch.no_grad():
     for utt_id, feat_mat in test_feat.items():
-        x = torch.Tensor(feat_mat).cuda().float()
-        # x = torch.Tensor([feat_mat]).cuda().float()
+        feat_mat = matrix_normalize(feat_mat, axis=1, fcn_type="mean")
+        # x = torch.Tensor(feat_mat).cuda().float()
+        x = torch.Tensor([feat_mat]).cuda().float()
         if sa_dir is not "":
-            x = model_sa(x)
-            # x = model_sa(x)[0]
+            # x = model_sa(x)
+            x, _ = model_sa(x)
+            x = x[0]
         y = dnn_am(x)
 
         post_prob = y.cpu().numpy()
