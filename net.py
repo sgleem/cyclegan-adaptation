@@ -74,7 +74,6 @@ class Generator_CNN(nn.Module):
         for r in self.res:
             h = r(h, spk)
 
-        h = self.res(h)
         h = self.upsample(h)
         h = h.permute(0, 2, 1)
         out = self.out(h)
