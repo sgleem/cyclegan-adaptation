@@ -246,11 +246,8 @@ for epoch in range(epochs):
             tf_xB = VAE_D_tf(xB)
             tf_xA2B = VAE_D_tf(xA2B)
             tf_xB2A = VAE_D_tf(xB2A)
-            spk_cA = VAE_D_spk(cA)
-            spk_cB = VAE_D_spk(cB)
-
+            
             adv = torch.mean(tf_xA) - torch.mean(tf_xA2B) + torch.mean(tf_xB) - torch.mean(tf_xB2A)
-            norm = nllloss(spk_cA, tA) + nllloss(spk_cB, tB)
             
             cA2B = VAE_E(xA2B, iB) 
             xA2B2A = VAE_G(cA2B, iA)
@@ -262,7 +259,6 @@ for epoch in range(epochs):
 
             # Save to Log
             lm.add_torch_stat("G_adv", adv)
-            lm.add_torch_stat("G_norm", norm)
             lm.add_torch_stat("cyc", cyc)
             lm.add_torch_stat("content", con_cyc)
 
