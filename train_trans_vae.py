@@ -37,7 +37,7 @@ lr_g = 0.00002
 lr_d = 0.00001
 
 save_per_epoch = 5
-adv_coef = 1.0; spk_coef = 10.0; kl_coef = 0.0001; cyc_coef=10.0; norm_coef = 0.0001
+adv_coef = 1.0; spk_coef = 10.0; kl_coef = 0.001; cyc_coef=10.0; norm_coef = 0.001; recon_coef = 10.0
 #####################################################################
 torch.cuda.empty_cache()
 os.system("mkdir -p "+ model_dir +"/parm")
@@ -183,7 +183,7 @@ for epoch in range(epochs):
         norm = -nllloss(spk_mA, tA) - nllloss(spk_mB, tB)
         recon = l1loss(xA2A, xA) + l1loss(xB2B, xB)
 
-        total = norm_coef * norm + recon
+        total = norm_coef * norm + recon_coef * recon
 
         for opt in [E_opt, m_opt, G_opt]:
             opt.zero_grad()
