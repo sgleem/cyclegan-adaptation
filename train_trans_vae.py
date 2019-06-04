@@ -18,7 +18,7 @@ from tool.kaldi.kaldi_manager import read_feat, read_vec
 parser = argparse.ArgumentParser()
 parser.add_argument("--train_dir", default="data/timit/train", type=str)
 parser.add_argument("--dev_dir", default="data/timit/dev", type=str)
-parser.add_argument("--model_dir", default="model/vae_timit", type=str)
+parser.add_argument("--model_dir", default="model/vae_timit_0603", type=str)
 parser.add_argument("--rank", default=0, type=int)
 parser.add_argument("--size", default=1, type=int)
 args = parser.parse_args()
@@ -119,8 +119,8 @@ for epoch in range(epochs):
         mxA, sxA = VAE_E(xA)
         mxB, sxB = VAE_E(xB)
 
-        mxA2B = mTranslator(mxA, iB)
-        mxB2A = mTranslator(mxB, iA)
+        mxA2B, siA = mTranslator(mxA, iA, iB)
+        mxB2A, siB = mTranslator(mxB, iB, iA)
 
         xA2B = VAE_G(mxA2B, sxA)
         xB2A = VAE_G(mxB2A, sxB)
@@ -168,31 +168,30 @@ for epoch in range(epochs):
         tA = [train_spkidx[spk_id] for spk_id, idx in dA]; tA = torch.Tensor(tA).long().cuda() # (batch_size)
         tB = [train_spkidx[spk_id] for spk_id, idx in dB]; tB = torch.Tensor(tB).long().cuda() # (batch_size)
 
-        mxA, sxA = VAE_E(xA)
-        mxB, sxB = VAE_E(xB)
+        mxA, stdA = VAE_E(xA)
+        mxB, stdB = VAE_E(xB)
 
-        mxA2A = mTranslator(mxA, iA)
-        mxB2B = mTranslator(mxB, iB)
+        xA2A = VAE_G(mxA, stdA)
+        xB2B = VAE_G(mxB, stdB)
 
-        xA2A = VAE_G(mxA2A, sxA)
-        xB2B = VAE_G(mxB2B, sxB)
+        # _, spk_siA = VAE_D(siA)
+        # _, spk_siB = VAE_D(siB)
 
-        _, spk_mA = VAE_D(mxA)
-        _, spk_mB = VAE_D(mxB)
-
-        norm = -nllloss(spk_mA, tA) - nllloss(spk_mB, tB)
+        norm = 0 #- nllloss(spk_siA, tA) - nllloss(spk_siB, tB)
         recon = l1loss(xA2A, xA) + l1loss(xB2B, xB)
+        kl = kl_for_vae(mxA, stdA) + kl_for_vae(mxB, stdB)
 
-        total = norm_coef * norm + recon_coef * recon
+        total = norm_coef * norm + recon_coef * recon + kl_coef * kl
 
-        for opt in [E_opt, m_opt, G_opt]:
+        for opt in [E_opt, G_opt]:
             opt.zero_grad()
         total.backward()
-        for opt in [E_opt, m_opt, G_opt]:
+        for opt in [E_opt, G_opt]:
             opt.step()
         # Save to Log
-        lm.add_torch_stat("norm", norm)
+        # lm.add_torch_stat("norm", norm)
         lm.add_torch_stat("recon", recon)
+        lm.add_torch_stat("KL", kl)
 
 
     # Domain Translation - Generator
@@ -214,14 +213,14 @@ for epoch in range(epochs):
         tA = [train_spkidx[spk_id] for spk_id, idx in dA]; tA = torch.Tensor(tA).long().cuda() # (batch_size)
         tB = [train_spkidx[spk_id] for spk_id, idx in dB]; tB = torch.Tensor(tB).long().cuda() # (batch_size)
 
-        siA, stdA = VAE_E(xA)
-        siB, stdB = VAE_E(xB)
+        mxA, stdA = VAE_E(xA)
+        mxB, stdB = VAE_E(xB)
 
-        saA2B = mTranslator(siA, iB)
-        saB2A = mTranslator(siB, iA)
+        mxA2B, siA = mTranslator(mxA, iA, iB)
+        mxB2A, siB = mTranslator(mxB, iB, iA)
 
-        xA2B = VAE_G(saA2B, stdA)
-        xB2A = VAE_G(saB2A, stdB)
+        xA2B = VAE_G(mxA2B, stdA)
+        xB2A = VAE_G(mxB2A, stdB)
 
         tf_A, _ = VAE_D(xA)
         tf_B, _ = VAE_D(xB)
@@ -234,18 +233,18 @@ for epoch in range(epochs):
 
         G_spk = nllloss(spk_A2B, tB) + nllloss(spk_B2A, tA) 
 
-        siA2B, stdA2B = VAE_E(xA2B)
-        siB2A, stdB2A = VAE_E(xB2A)
+        mxA2B, stdA2B = VAE_E(xA2B)
+        mxB2A, stdB2A = VAE_E(xB2A)
 
-        saA2B2A = mTranslator(siA2B, iA)
-        saB2A2B = mTranslator(siB2A, iB)
+        mxA2B2A, siA2B = mTranslator(mxA2B, iB, iA)
+        mxB2A2B, siB2A = mTranslator(mxB2A, iA, iB)
 
-        xA2B2A = VAE_G(saA2B2A, stdA2B)
-        xB2A2B = VAE_G(saB2A2B, stdB2A)
+        xA2B2A = VAE_G(mxA2B2A, stdA2B)
+        xB2A2B = VAE_G(mxB2A2B, stdB2A)
 
         cyc = l1loss(xA2B2A, xA) + l1loss(xB2A2B, xB)
         content = l1loss(siA2B, siA) + l1loss(siB2A, siB)
-        kl = kl_for_vae(siA, stdA) + kl_for_vae(siB, stdB) + kl_for_vae(siB2A, stdB2A) + kl_for_vae(siA2B, stdA2B)
+        kl = kl_for_vae(mxA, stdA) + kl_for_vae(mxB, stdB) + kl_for_vae(mxB2A, stdB2A) + kl_for_vae(mxA2B, stdA2B)
         
         total = adv_coef * G_adv + spk_coef * G_spk + kl_coef * kl + cyc_coef * cyc + content 
         for opt in [E_opt, m_opt, G_opt]:
@@ -284,31 +283,31 @@ for epoch in range(epochs):
             iA = [dev_ivecs[spk_id] for spk_id, idx in dA]; iA = torch.Tensor(iA).float().cuda() # (batch_size, 100)
             iB = [dev_ivecs[spk_id] for spk_id, idx in dB]; iB = torch.Tensor(iB).float().cuda() # (batch_size, 100)
 
-            siA, stdA = VAE_E(xA)
-            siB, stdB = VAE_E(xB)
+            mxA, stdA = VAE_E(xA)
+            mxB, stdB = VAE_E(xB)
 
-            saA2B = mTranslator(siA, iB)
-            saB2A = mTranslator(siB, iA)
+            mxA2B, siA = mTranslator(mxA, iA, iB)
+            mxB2A, siB = mTranslator(mxB, iB, iA)
 
-            A2B = VAE_G(saA2B, stdA)
-            B2A = VAE_G(saB2A, stdB)
+            xA2B = VAE_G(mxA2B, stdA)
+            xB2A = VAE_G(mxB2A, stdB)
 
             tf_A, _ = VAE_D(xA)
             tf_B, _ = VAE_D(xB)
-            tf_A2B, _ = VAE_D(A2B)
-            tf_B2A, _ = VAE_D(B2A)
+            tf_A2B, _ = VAE_D(xA2B)
+            tf_B2A, _ = VAE_D(xB2A)
 
             D_adv = torch.mean(tf_A2B) - torch.mean(tf_A) + torch.mean(tf_B2A) - torch.mean(tf_B)
-            G_adv = torch.mean(tf_A) - torch.mean(tf_A2B) + torch.mean(tf_B) - torch.mean(tf_B2A)
+            G_adv = -1 * D_adv
 
-            siA2B, stdA2B = VAE_E(A2B)
-            siB2A, stdB2A = VAE_E(B2A)
+            mxA2B, stdA2B = VAE_E(xA2B)
+            mxB2A, stdB2A = VAE_E(xB2A)
 
-            saA2B2A = mTranslator(siA2B, iA)
-            saB2A2B = mTranslator(siB2A, iB)
+            mxA2B2A, siA2B = mTranslator(mxA2B, iB, iA)
+            mxB2A2B, siB2A = mTranslator(mxB2A, iA, iB)
 
-            xA2B2A = VAE_G(saA2B2A, stdA2B)
-            xB2A2B = VAE_G(saB2A2B, stdB2A)
+            xA2B2A = VAE_G(mxA2B2A, stdA2B)
+            xB2A2B = VAE_G(mxB2A2B, stdB2A)
 
             cyc = l1loss(xA2B2A, xA) + l1loss(xB2A2B, xB)
             content = l1loss(siA2B, siA) + l1loss(siB2A, siB)
