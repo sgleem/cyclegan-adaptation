@@ -79,29 +79,54 @@ class Generator_CNN(nn.Module):
         out = self.out(h)
         
         return out
+class Discriminator_MLP(nn.Module):
+    # (N, T, 120) -> (N, T, 120- > 512- > 512 -> 1)
+    def __init__(self, *args, **kwargs):
+        super(Discriminator_MLP, self).__init__()
+        feat_dim = kwargs.get("feat_dim", 120)
+        hidden_dim = kwargs.get("hidden_dim", 512)
+                
+        self.mlp = nn.Sequential(
+            nn.Linear(feat_dim, hidden_dim), nn.LeakyReLU(),
+            nn.Linear(hidden_dim, hidden_dim), nn.LeakyReLU(),
+            nn.Linear(hidden_dim, 1)
+        )
+        
+    def forward(self, x):
+        h = self.mlp(x)
+        tf = torch.sigmoid(h)
+        return tf
 
 class Discriminator_CNN(nn.Module):
+    # (N, T, 120) -> (N, 1 -> 4 -> 16 -> 64, 128 -> 64 -> 32 -> 16, 120 -> 60 -> 30 -> 15)
     def __init__(self, *args, **kwargs):
         super(Discriminator_CNN, self).__init__()
         feat_dim = kwargs.get("feat_dim", 120)
+        frame_dim = kwargs.get("frame_dim", 128)
         hidden_dim = kwargs.get("hidden_dim", 512)
+        spk_dim = kwargs.get("spk_dim", 462)
+        
         self.downsample = nn.Sequential(
-            ConvSample(inC=feat_dim, outC=128, k=5, s=1, p=2),
-            ConvSample(inC=128, outC=256, k=5, s=1, p=2)
+            ConvSample2D(inC=1, outC=4, k=4, s=2, p=1),
+            ConvSample2D(inC=4, outC=4, k=3, s=1, p=1),
+            ConvSample2D(inC=4, outC=16, k=4, s=2, p=1),
+            ConvSample2D(inC=16, outC=16, k=3, s=1, p=1),
+            ConvSample2D(inC=16, outC=64, k=4, s=2, p=1)
         )
         self.out = nn.Sequential(
-            nn.Linear(256, hidden_dim), nn.LeakyReLU(),
-            nn.Linear(hidden_dim, 1)
+            nn.Linear(feat_dim * frame_dim, hidden_dim),
+            nn.LeakyReLU(),
+            nn.Linear(hidden_dim, spk_dim)
         )
-
     def forward(self, x):
-        x = x.permute(0, 2, 1)
+        x = x.unsqueeze(dim=1)
         h = self.downsample(x)
-        h = h.permute(0, 2, 1)
-        out = self.out(h)
-        out = torch.sigmoid(out)
+        h = torch.flatten(h, start_dim=1)
+        h = self.out(h)
+        spk = F.log_softmax(h, dim=1)
         
-        return out
+        return spk
+
 
 ######### Speaker normalizer #########
 
@@ -176,9 +201,6 @@ class VAE_Generator(nn.Module):
             ConvSample(inC=feat_dim*2, outC=feat_dim*4, k=3, s=1, p=1)
         )
         self.res = nn.ModuleList([
-            # Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
-            # Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
-            # Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1)
             Residual_Cat(mainC=feat_dim*4, auxC=aux_dim, hiddenC=feat_dim*8, k=3, s=1, p=1),
             Residual_Cat(mainC=feat_dim*4, auxC=aux_dim, hiddenC=feat_dim*8, k=3, s=1, p=1),
             Residual_Cat(mainC=feat_dim*4, auxC=aux_dim, hiddenC=feat_dim*8, k=3, s=1, p=1)
