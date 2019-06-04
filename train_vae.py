@@ -218,7 +218,7 @@ for epoch in range(epochs):
     lm.print_stat()
     # Eval
     lm.init_stat()
-    for model in [VAE_E, VAE_G, VAE_D]:
+    for model in [VAE_E, VAE_G, VAE_D_tf, VAE_D_spk]:
         model.eval()
     with torch.no_grad():
         for spk_ids, idxs in dev_loader:
