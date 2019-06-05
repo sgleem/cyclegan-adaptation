@@ -31,17 +31,21 @@ def copy_vector(vec_path="-", out_path="-"):
     result_cmd=make_kaldi_cmd(kaldi_cmd, r_specifier, o_specifier)
     return result_cmd
 
-def compute_cmvn_stats(feat_path="-", out_path="-"):
+def compute_cmvn_stats(feat_path="-", out_path="-", spk2utt_path="-"):
     """
     compute-cmvn-stats <ark:feats.ark> <ark:-> |
     """
     kaldi_cmd="compute-cmvn-stats"
     r_specifier=get_specifier(feat_path)
     o_specifier=get_specifier(out_path)
-    result_cmd=make_kaldi_cmd(kaldi_cmd, r_specifier, o_specifier)
+    if spk2utt_path is "-":
+        result_cmd=make_kaldi_cmd(kaldi_cmd, r_specifier, o_specifier)
+    else:
+        s2u_specifier=get_specifier(spk2utt_path)
+        result_cmd=make_kaldi_cmd(kaldi_cmd, s2u_specifier, r_specifier, o_specifier)
     return result_cmd
 
-def apply_cmvn(cmvn_path="-", feat_path="-", out_path="-"):
+def apply_cmvn(cmvn_path="-", feat_path="-", out_path="-", utt2spk_path="-"):
     """
     apply-cmvn <ark:feats.scp> <ark:-> |
     """
@@ -49,7 +53,11 @@ def apply_cmvn(cmvn_path="-", feat_path="-", out_path="-"):
     r_specifier1=get_specifier(cmvn_path)
     r_specifier2=get_specifier(feat_path)
     o_specifier=get_specifier(out_path)
-    result_cmd=make_kaldi_cmd(kaldi_cmd, r_specifier1, r_specifier2, o_specifier)
+    if utt2spk_path is "-":
+        result_cmd=make_kaldi_cmd(kaldi_cmd, r_specifier1, r_specifier2, o_specifier)
+    else:
+        u2s_specifier=get_specifier(utt2spk_path)
+        result_cmd=make_kaldi_cmd(kaldi_cmd, u2s_specifier, r_specifier1, r_specifier2, o_specifier)
     return result_cmd
 def add_deltas(feat_path="-", out_path="-"):
     """

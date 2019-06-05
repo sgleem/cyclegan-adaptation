@@ -31,13 +31,13 @@ model_dir = args.model_dir
 #####################################################################
 epochs = 24
 lr = 0.0001
-pdf_num = 3424
+pdf_num = 1920
 #####################################################################
 os.system("mkdir -p " + model_dir + "/parm")
 os.system("mkdir -p " + model_dir + "/opt")
 
-train_feat = read_feat(train_feat_dir+"/feats.ark", delta=True)
-dev_feat = read_feat(dev_feat_dir+"/feats.ark", delta=True)
+train_feat = read_feat(train_feat_dir+"/feats.ark", cmvn=True, delta=True)
+dev_feat = read_feat(dev_feat_dir+"/feats.ark", cmvn=True, delta=True)
 
 train_ali = read_ali(train_ali_dir+"/ali.*.gz", train_ali_dir+"/final.mdl")
 dev_ali = read_ali(dev_ali_dir+"/ali.*.gz", dev_ali_dir+"/final.mdl")
@@ -62,12 +62,6 @@ model_ivec_sch = sch.ReduceLROnPlateau(model_ivec_opt, factor=0.5, patience=0, v
 
 lm = LogManager()
 lm.alloc_stat_type_list(["train_loss","train_acc","dev_loss","dev_acc"])
-
-# preprocess
-# for dataset in [train_feat, dev_feat]:
-#     for utt_id, feat_mat in dataset.items():
-#         feat_mat = pp.matrix_normalize(feat_mat, axis=1, fcn_type="mean")
-#         dataset[utt_id] = feat_mat
 
 # prior calculation
 prior = np.zeros(pdf_num)
@@ -144,8 +138,11 @@ for epoch in range(epochs):
 
     lm.print_stat()
 
-    parm_path = model_dir+"/parm/"+str(epoch)+".pt"
+    parm_path = model_dir+"/parm/"+str(epoch)+"_si.pt"
     torch.save(model.state_dict(), parm_path)
+
+    parm_path = model_dir+"/parm/"+str(epoch)+"_ivec.pt"
+    torch.save(model_ivec.state_dict(), parm_path)
 
     opt_path = model_dir+"/opt/"+str(epoch)+".pt"
     torch.save(model_opt.state_dict(), opt_path)
