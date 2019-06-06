@@ -20,7 +20,7 @@ parser.add_argument("--train_feat_dir", default="data/timit/train", type=str)
 parser.add_argument("--train_ali_dir", default="ali/timit/train", type=str)
 parser.add_argument("--dev_feat_dir", default="data/timit/dev", type=str)
 parser.add_argument("--dev_ali_dir", default="ali/timit/dev", type=str)
-parser.add_argument("--model_dir", default="model/ligru_timit", type=str)
+parser.add_argument("--model_dir", default="model/gru_timit", type=str)
 parser.add_argument("--rank", default=0, type=int)
 parser.add_argument("--size", default=1, type=int)
 args = parser.parse_args()
@@ -33,7 +33,7 @@ model_dir = args.model_dir
 #####################################################################
 epochs = 24
 lr = 0.0001
-pdf_num = 3424
+pdf_num = 1920
 #####################################################################
 os.system("mkdir -p " + model_dir + "/parm")
 os.system("mkdir -p " + model_dir + "/opt")
