@@ -14,7 +14,7 @@ from data_preprocess import matrix_normalize
 from tool.log import LogManager
 from tool.loss import nllloss, calc_err
 from tool.kaldi import kaldi_io as kio
-from tool.kaldi.kaldi_manager import read_feat, read_ali
+from tool.kaldi.kaldi_manager import read_feat, read_ali, read_vec
 #####################################################################
 parser = argparse.ArgumentParser()
 parser.add_argument("--train_feat_dir", default="data/timit/train", type=str)
@@ -23,7 +23,7 @@ parser.add_argument("--dev_feat_dir", default="data/timit/dev", type=str)
 parser.add_argument("--dev_ali_dir", default="ali/timit/dev", type=str)
 parser.add_argument("--si_dir", default="model/gru_norm", type=str)
 parser.add_argument("--sa_dir", default="model/vae_timit", type=str)
-parser.add_argument("--resi_dir", default="model/gru_norm_retrained", type=str)
+parser.add_argument("--resi_dir", default="model/gru_retrained", type=str)
 args = parser.parse_args()
 #####################################################################
 train_feat_dir = args.train_feat_dir
@@ -41,12 +41,14 @@ lr = 0.0001
 os.system("mkdir -p " + resi_dir + "/parm")
 os.system("mkdir -p " + resi_dir + "/opt")
 
-train_feat = read_feat(train_feat_dir+"/feats.ark", delta=True)
-dev_feat = read_feat(dev_feat_dir+"/feats.ark", delta=True)
+train_feat = read_feat(train_feat_dir+"/feats.ark", cmvn=True, delta=True)
+dev_feat = read_feat(dev_feat_dir+"/feats.ark", cmvn=True, delta=True)
 train_ali = read_ali(train_ali_dir+"/ali.*.gz", train_ali_dir+"/final.mdl")
 dev_ali = read_ali(dev_ali_dir+"/ali.*.gz", dev_ali_dir+"/final.mdl")
 train_utt = list(train_feat.keys())
 dev_utt = list(dev_feat.keys())
+train_ivecs = read_vec(train_feat_dir+"/ivectors.ark")
+dev_ivecs = read_vec(dev_feat_dir+"/ivectors.ark")
 
 model_sa = torch.load(sa_dir+"/init.pt")
 model_sa.load_state_dict(torch.load(sa_dir+"/final.pt"))
@@ -54,13 +56,24 @@ model_sa.cuda()
 
 # get normalized feat
 print("Feature generation start")
+dset_dict={"train": train_feat, "dev":dev_feat}
+ivec_dict={"train": train_ivecs, "dev":dev_ivecs}
+
 model_sa.eval()
 with torch.no_grad():
-    for dataset in [train_feat, dev_feat]:
+    for dset_name in ["train", "dev"]:
+        dataset = dset_dict[dset_name]
+        ivecset = ivec_dict[dset_name]
         for utt_id, feat_mat in dataset.items():
-            feat_mat = matrix_normalize(feat_mat, axis=1, fcn_type="mean")
             x = torch.Tensor([feat_mat]).cuda().float()
-            x, _ = model_sa(x)
+
+            spk_id = utt_id.split("_")[0]
+            ivecs = ivecset[spk_id]
+            ivecs = torch.Tensor([ivecs]).cuda().float()
+            print(x.size())
+            print(ivecs.size())
+            
+            x = model_sa(x,ivecs)
             x = x[0].cpu().detach().numpy()
             dataset[utt_id] = x
 print("Feature generation complete")

@@ -42,7 +42,7 @@ def compute_cmvn_stats(feat_path="-", out_path="-", spk2utt_path="-"):
         result_cmd=make_kaldi_cmd(kaldi_cmd, r_specifier, o_specifier)
     else:
         s2u_specifier=get_specifier(spk2utt_path)
-        result_cmd=make_kaldi_cmd(kaldi_cmd, s2u_specifier, r_specifier, o_specifier)
+        result_cmd=make_kaldi_cmd(kaldi_cmd, "--spk2utt="+s2u_specifier, r_specifier, o_specifier)
     return result_cmd
 
 def apply_cmvn(cmvn_path="-", feat_path="-", out_path="-", utt2spk_path="-"):
@@ -57,7 +57,7 @@ def apply_cmvn(cmvn_path="-", feat_path="-", out_path="-", utt2spk_path="-"):
         result_cmd=make_kaldi_cmd(kaldi_cmd, r_specifier1, r_specifier2, o_specifier)
     else:
         u2s_specifier=get_specifier(utt2spk_path)
-        result_cmd=make_kaldi_cmd(kaldi_cmd, u2s_specifier, r_specifier1, r_specifier2, o_specifier)
+        result_cmd=make_kaldi_cmd(kaldi_cmd, "--utt2spk="+u2s_specifier, r_specifier1, r_specifier2, o_specifier)
     return result_cmd
 def add_deltas(feat_path="-", out_path="-"):
     """

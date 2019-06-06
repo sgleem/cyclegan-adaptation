@@ -58,15 +58,15 @@ class KaldiReadManager:
 
 def read_feat(feat_path, cmvn=False, delta=True):
     km = KaldiReadManager()
-    
+    feat_dir = "/".join(feat_path.split("/")[:-1])
     if cmvn:
-        km.set_command("compute-cmvn-stats", feat_path=feat_path, out_path="cmvn.ark")
+        km.set_command("compute-cmvn-stats", feat_path=feat_path, out_path=feat_dir+"/cmvn.ark", spk2utt_path=feat_dir+"/spk2utt")
         km.run()
     
     km.init_command()
     km.set_command("copy-feats", feat_path)
     if cmvn:
-        km.set_command("apply-cmvn", cmvn_path="cmvn.ark")
+        km.set_command("apply-cmvn", cmvn_path=feat_dir+"/cmvn.ark", utt2spk_path=feat_dir+"/utt2spk")
     if delta:
         km.set_command("add-deltas")
     feat_dict = km.read_to_mat()
