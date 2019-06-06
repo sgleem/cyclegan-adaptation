@@ -16,10 +16,10 @@ from tool.kaldi.kaldi_manager import read_feat
 
 #####################################################################
 parser = argparse.ArgumentParser()
-parser.add_argument("--adapt_dir", default="data/ffmtimit/adapt", type=str)
-parser.add_argument("--dev_dir", default="data/ffmtimit/dev", type=str)
+parser.add_argument("--adapt_dir", default="data/ntimit/adapt", type=str)
+parser.add_argument("--dev_dir", default="data/ntimit/dev", type=str)
 parser.add_argument("--clean_dir", default="data/timit/target", type=str)
-parser.add_argument("--model_dir", default="model/cyclegan", type=str)
+parser.add_argument("--model_dir", default="model/cyclegan_0606", type=str)
 parser.add_argument("--rank", default=0, type=int)
 parser.add_argument("--size", default=1, type=int)
 args = parser.parse_args()
@@ -47,7 +47,7 @@ clean_storage = read_feat(clean_dir+"/feats.ark", delta=True)
 
 for dataset in [adapt_storage, dev_storage, clean_storage]:
     for utt_id, feat_mat in dataset.items():
-        feat_mat = pp.matrix_normalize(feat_mat, axis=1, fcn_type="mean")
+        feat_mat = pp.simulate_packet_loss(feat_mat)
         dataset[utt_id] = feat_mat
 
 adapt_set = pp.make_cnn_dataset(adapt_storage, input_size=128); print(len(adapt_set))

@@ -101,3 +101,16 @@ def make_spk_cnn_set(utt_dict, frame_size=128, step_size=64):
         
     return cnn_dict
 
+def simulate_packet_loss(feat_mat, loss_per=5):
+    assert 0 <= loss_per < 100, "Loss rate should be set within range [0, 100)"
+    feat_mat = np.array(feat_mat)
+    feat_dim = len(feat_mat[0])
+    total_frame_num = len(feat_mat)
+    loss_frame_num = total_frame_num * loss_per // 100
+    loss_index_list = np.random.choice(total_frame_num, loss_frame_num, replace=False)
+
+    for loss_index in loss_index_list:
+        feat_mat[loss_index] = np.zeros(feat_dim)
+    
+    return feat_mat
+

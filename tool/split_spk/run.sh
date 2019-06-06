@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Example)
-#   script/split_file_storage/run.sh data/noise/test.fbk data/adaptation
+#   tool/split_spk/run.sh data/ntimit/train data/ntimit 231
 # In Prepare)
 # Input: 1. $in_dir/spk2utt
 #        2. $out_dir
@@ -16,7 +16,7 @@
 
 
 if [ $# -lt 3 ]; then
-    echo "bash script/split_spk/run.sh data/noise/dev.fbk data/adaptation 6"
+    echo "bash tool/split_spk/run.sh data/ntimit/train data/ntimit 231"
     exit 0;
 fi
 inDir=$1
@@ -26,17 +26,19 @@ start_idx=0
 if [ $# -gt 3 ]; then
     start_idx=$4
 fi
-total_num=224
+total_num=462
 if [ $# -gt 4 ]; then
     total_num=$5
 fi
 
 # 0. run prepare.py
 package_dir=`dirname $0`
-python3 ${package_dir}/prepare.py $inDir $rootDir $train_num $total_num $start_idx || exit 1;
+mkdir -p ${rootDir}/adapt
+python3 ${package_dir}/prepare.py $inDir $rootDir/adapt $train_num $total_num $start_idx || exit 1;
 
 
 for dType in adapt; do
+    
     outDir=${rootDir}/${dType}
 
     #   1. Read Uttlist ( cat | sort | uniq )
