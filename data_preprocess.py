@@ -70,7 +70,6 @@ def matrix_normalize(origin_mat, axis=None, fcn_type="mean"):
 def make_cnn_dataset(utt_dict, input_size=128, step_size=64):
     segment_set = []
     for frame_mat in utt_dict.values():
-    
         frame_len = len(frame_mat)
         if frame_len < input_size:
             continue
