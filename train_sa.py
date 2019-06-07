@@ -103,10 +103,10 @@ for epoch in range(epochs):
 
         adv_t = torch.mean(wide_true) + torch.mean(narrow_true)
         adv_f = torch.mean(wide_false) + torch.mean(narrow_false)
-        adv = adv_coef * (adv_f - adv_t)
+        adv = adv_f - adv_t
 
         # Update Parameter
-        total = adv
+        total = adv_coef * adv
         for opt in [Dw_opt, Dn_opt]:
             opt.zero_grad()
         total.backward()
@@ -130,20 +130,20 @@ for epoch in range(epochs):
 
         adv_t = torch.mean(wide_true) + torch.mean(narrow_true)
         adv_f = torch.mean(wide_false) + torch.mean(narrow_false)
-        adv = adv_coef * (adv_t - adv_f)
+        adv = adv_t - adv_f
 
         # Cycle consistent training
         n2w2n = Gw2n(n2w); w2n2w = Gn2w(w2n)
         cyc1 = l1loss(n2w2n, n); cyc2 = l1loss(w2n2w, w)
-        cyc = cyc_coef * (cyc1 + cyc2)
+        cyc = cyc1 + cyc2
 
         # Id traning
-        total = adv + cyc
+        total =adv_coef * adv + cyc_coef * cyc
         if id_coef > 0.0:
             w2w = Gn2w(w); n2n = Gw2n(n)
             idl1 = l1loss(w2w, w); idl2 = l1loss(n2n, n)
-            idl = id_coef * (idl1 + idl2)
-            total += idl
+            idl =  idl1 + idl2
+            total += id_coef * idl
         
         # Update Parameter
         for opt in [Gn2w_opt, Gw2n_opt]:
@@ -173,17 +173,17 @@ for epoch in range(epochs):
             n2w = Gn2w(n)
             wide_false = Dw(n2w)
 
-            D_adv = adv_coef * torch.mean(wide_false)
+            D_adv = torch.mean(wide_false)
             G_adv = -1 * D_adv
 
             # Cycle consistent stat
             n2w2n = Gw2n(n2w)
-            cyc = cyc_coef * l1loss(n2w2n, n)
+            cyc = l1loss(n2w2n, n)
 
             # Id stat
             if id_coef > 0.0:
                 n2n = Gw2n(n)
-                idl = id_coef * l1loss(n2n, n)
+                idl = l1loss(n2n, n)
 
             # Save to Log
             lm.add_torch_stat("D_adv", D_adv)
