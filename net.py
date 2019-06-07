@@ -17,11 +17,14 @@ class GRU_HMM(nn.Module):
         self.HMM = nn.Linear(hidden_dim * 2, output_dim)
         
     def forward(self, x):
-        x = torch.unsqueeze(x, dim=1)
+        xdim = len(list(x.size()))
+        if xdim == 2:
+            x = torch.unsqueeze(x, dim=1)
         h, _ = self.GRU(x)
-        h = torch.squeeze(h, dim=1)
         out = self.HMM(h)
-        out = F.log_softmax(out, dim=1)
+        out = F.log_softmax(out, dim=2)
+        if xdim == 2:
+            out = torch.squeeze(out, dim=1)
         return out
 
 class ivecNN(nn.Module):

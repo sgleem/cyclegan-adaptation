@@ -44,13 +44,6 @@ os.system("mkdir -p "+ model_dir +"/parm")
 adapt_storage = read_feat(adapt_dir+"/feats.ark", delta=True)
 dev_storage = read_feat(dev_dir+"/feats.ark", delta=True)
 wide_storage = read_feat(wide_dir+"/feats.ark", delta=True)
-print(len(adapt_storage))
-print(len(dev_storage))
-print(len(wide_storage))
-for dataset in [adapt_storage, dev_storage]:
-    for utt_id, feat_mat in dataset.items():
-        feat_mat = pp.simulate_packet_loss(feat_mat)
-        dataset[utt_id] = feat_mat
 
 adapt_set = pp.make_cnn_dataset(adapt_storage, input_size=64, step_size=32); print(len(adapt_set))
 dev_set = pp.make_cnn_dataset(dev_storage, input_size=64, step_size=32); print(len(dev_set))
@@ -97,8 +90,10 @@ for epoch in range(epochs):
         model.train()
     # D & SPK phase
     for narrow_utt, wide_utt in zip(adapt_loader, wide_loader):
-        n = narrow_utt.cuda().float()
-        w = wide_utt.cuda().float()
+        n = pp.simulate_packet_loss(narrow_utt.numpy(), loss_per=10, minibatch=True)
+        n = torch.Tensor(n).cuda().float()
+        w = pp.simulate_packet_loss(wide_utt.numpy(), loss_per=10, minibatch=True)
+        w = torch.Tensor(w).cuda().float()
 
         n2w = Gn2w(n)
         w2n = Gw2n(w)
@@ -122,8 +117,10 @@ for epoch in range(epochs):
         lm.add_torch_stat("D_adv", adv)
     # G phase
     for narrow_utt, wide_utt in zip(adapt_loader, wide_loader):
-        n = narrow_utt.cuda().float()
-        w = wide_utt.cuda().float()
+        n = pp.simulate_packet_loss(narrow_utt.numpy(), loss_per=10, minibatch=True)
+        n = torch.Tensor(n).cuda().float()
+        w = pp.simulate_packet_loss(wide_utt.numpy(), loss_per=10, minibatch=True)
+        w = torch.Tensor(w).cuda().float()
 
         n2w = Gn2w(n)
         w2n = Gw2n(w)
@@ -170,7 +167,8 @@ for epoch in range(epochs):
     with torch.no_grad():
         # Accumulate adv, cyc, id loss
         for dev_utt in dev_loader:
-            n = dev_utt.cuda().float()
+            n = pp.simulate_packet_loss(narrow_utt.numpy(), loss_per=10, minibatch=True)
+            n = torch.Tensor(n).cuda().float()
 
             n2w = Gn2w(n)
             wide_false = Dw(n2w)
