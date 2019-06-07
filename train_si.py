@@ -1,4 +1,5 @@
 import os
+import sys
 import argparse
 import random
 
@@ -7,6 +8,7 @@ import pickle as pk
 import torch
 import torch.optim as opt
 import torch.optim.lr_scheduler as sch
+from torch.nn.utils.rnn import pad_sequence
 
 import net
 import data_preprocess as pp
@@ -31,21 +33,25 @@ dev_feat_dir = args.dev_feat_dir
 dev_ali_dir = args.dev_ali_dir
 model_dir = args.model_dir
 #####################################################################
-epochs = 24
+epochs = 100
+batch_size = 1
 lr = 0.0001
 pdf_num = 1920
 #####################################################################
 os.system("mkdir -p " + model_dir + "/parm")
 os.system("mkdir -p " + model_dir + "/opt")
 
-train_feat = read_feat(train_feat_dir+"/feats.ark", cmvn=True, delta=True)
-dev_feat = read_feat(dev_feat_dir+"/feats.ark", cmvn=True, delta=True)
+train_feat = read_feat(train_feat_dir+"/feats.ark", delta=True)
+dev_feat = read_feat(dev_feat_dir+"/feats.ark", delta=True)
 
 train_ali = read_ali(train_ali_dir+"/ali.*.gz", train_ali_dir+"/final.mdl")
 dev_ali = read_ali(dev_ali_dir+"/ali.*.gz", dev_ali_dir+"/final.mdl")
 
 train_utt = list(train_feat.keys())
 dev_utt = list(dev_feat.keys())
+
+# sort by frame length
+train_utt.sort(key=lambda x: len(train_feat[x]))
 
 model = net.GRU_HMM(input_dim=120, hidden_dim=320, num_layers=5, output_dim=pdf_num)
 torch.save(model, model_dir+"/init.pt")
@@ -67,19 +73,30 @@ with open(model_dir+"/prior.pk", 'wb') as f:
 # model training
 for epoch in range(epochs):
     print("Epoch",epoch)
-    random.shuffle(train_utt)
+    # random.shuffle(train_utt)
     model.train()
     lm.init_stat()
-    for utt_id in train_utt:
-        x = train_feat[utt_id]
-        # ali = train_ali[utt_id]
-        ali = train_ali.get(utt_id,[])
-        if len(ali) == 0:
-            continue
-        x = torch.Tensor(x).cuda().float()
-        y = torch.Tensor(ali).cuda().long()
+    # for utt_id in train_utt:
+    for start_idx in range(0, len(train_utt), batch_size):
+        cur_batch = train_utt[start_idx : min(start_idx + batch_size, len(train_utt))]
+        x = []; y = []
+        for utt_id in cur_batch:
+            feat = train_feat[utt_id]
+            ali = train_ali.get(utt_id,[])
+            if len(ali) == 0:
+                continue
+            x.append(torch.Tensor(feat))
+            y.append(torch.Tensor(ali))
+
+        x = pad_sequence(x)
+        y = pad_sequence(y)
+        y = torch.flatten(y)
+
+        x = x.cuda().float()
+        y = y.cuda().long()
 
         pred = model(x)
+        pred = torch.flatten(pred, start_dim=0, end_dim=1)
         loss = nllloss(pred, y)
         err = calc_err(pred, y)
 
@@ -89,15 +106,14 @@ for epoch in range(epochs):
 
         lm.add_torch_stat("train_loss", loss)
         lm.add_torch_stat("train_acc", 1.0 - err)
-
     model.eval()
     with torch.no_grad():
         for utt_id in dev_utt:
             x = dev_feat[utt_id]
-            ali = dev_ali[utt_id]
+            y = dev_ali[utt_id]
 
             x = torch.Tensor(x).cuda().float()
-            y = torch.Tensor(ali).cuda().long()
+            y = torch.Tensor(y).cuda().long()
 
             pred = model(x)
             loss = nllloss(pred, y)
