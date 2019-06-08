@@ -20,6 +20,7 @@ parser.add_argument("--adapt_dir", default="data/ntimit/adapt", type=str)
 parser.add_argument("--dev_dir", default="data/ntimit/dev", type=str)
 parser.add_argument("--wide_dir", default="data/timit/target", type=str)
 parser.add_argument("--model_dir", default="model/cyclegan", type=str)
+parser.add_argument("--loss_per", default=0, type=int)
 parser.add_argument("--rank", default=0, type=int)
 parser.add_argument("--size", default=1, type=int)
 args = parser.parse_args()
@@ -28,6 +29,7 @@ adapt_dir = args.adapt_dir
 dev_dir = args.dev_dir
 wide_dir = args.wide_dir
 model_dir = args.model_dir
+loss_per = args.loss_per
 #####################################################################
 epochs = 1000
 batch_size = 64
@@ -45,9 +47,9 @@ adapt_storage = read_feat(adapt_dir+"/feats.ark", delta=True)
 dev_storage = read_feat(dev_dir+"/feats.ark", delta=True)
 wide_storage = read_feat(wide_dir+"/feats.ark", delta=True)
 
-adapt_set = pp.make_cnn_dataset(adapt_storage, input_size=64, step_size=32); print(len(adapt_set))
-dev_set = pp.make_cnn_dataset(dev_storage, input_size=64, step_size=32); print(len(dev_set))
-wide_set = pp.make_cnn_dataset(wide_storage, input_size=64, step_size=32); print(len(wide_set))
+adapt_set = pp.make_cnn_dataset(adapt_storage, input_size=128, step_size=64); print(len(adapt_set))
+dev_set = pp.make_cnn_dataset(dev_storage, input_size=128, step_size=64); print(len(dev_set))
+wide_set = pp.make_cnn_dataset(wide_storage, input_size=128, step_size=64); print(len(wide_set))
 
 adapt_loader = DataLoader(adapt_set, batch_size=batch_size, shuffle=True)
 dev_loader = DataLoader(dev_set, batch_size=batch_size)
@@ -55,8 +57,8 @@ wide_loader = DataLoader(wide_set, batch_size=batch_size, shuffle=True)
 
 Gn2w = net.Generator_CNN(feat_dim=120)
 Gw2n = net.Generator_CNN(feat_dim=120)
-Dn = net.Discriminator_CNN(feat_dim=120, frame_dim=64, hidden_dim=512)
-Dw = net.Discriminator_CNN(feat_dim=120, frame_dim=64, hidden_dim=512)
+Dn = net.Discriminator_CNN(feat_dim=120, frame_dim=128, hidden_dim=512)
+Dw = net.Discriminator_CNN(feat_dim=120, frame_dim=128, hidden_dim=512)
 
 Gn2w_opt = optim.Adam(Gn2w.parameters(), lr=lr_g)
 Gw2n_opt = optim.Adam(Gw2n.parameters(), lr=lr_g)
@@ -90,9 +92,9 @@ for epoch in range(epochs):
         model.train()
     # D & SPK phase
     for narrow_utt, wide_utt in zip(adapt_loader, wide_loader):
-        n = pp.simulate_packet_loss(narrow_utt.numpy(), loss_per=10, minibatch=True)
+        n = pp.simulate_packet_loss(narrow_utt.numpy(), loss_per=loss_per, minibatch=True)
         n = torch.Tensor(n).cuda().float()
-        w = pp.simulate_packet_loss(wide_utt.numpy(), loss_per=10, minibatch=True)
+        w = pp.simulate_packet_loss(wide_utt.numpy(), loss_per=loss_per, minibatch=True)
         w = torch.Tensor(w).cuda().float()
 
         n2w = Gn2w(n)
@@ -117,9 +119,9 @@ for epoch in range(epochs):
         lm.add_torch_stat("D_adv", adv)
     # G phase
     for narrow_utt, wide_utt in zip(adapt_loader, wide_loader):
-        n = pp.simulate_packet_loss(narrow_utt.numpy(), loss_per=10, minibatch=True)
+        n = pp.simulate_packet_loss(narrow_utt.numpy(), loss_per=loss_per, minibatch=True)
         n = torch.Tensor(n).cuda().float()
-        w = pp.simulate_packet_loss(wide_utt.numpy(), loss_per=10, minibatch=True)
+        w = pp.simulate_packet_loss(wide_utt.numpy(), loss_per=loss_per, minibatch=True)
         w = torch.Tensor(w).cuda().float()
 
         n2w = Gn2w(n)
@@ -167,7 +169,7 @@ for epoch in range(epochs):
     with torch.no_grad():
         # Accumulate adv, cyc, id loss
         for dev_utt in dev_loader:
-            n = pp.simulate_packet_loss(narrow_utt.numpy(), loss_per=10, minibatch=True)
+            n = pp.simulate_packet_loss(narrow_utt.numpy(), loss_per=loss_per, minibatch=True)
             n = torch.Tensor(n).cuda().float()
 
             n2w = Gn2w(n)
