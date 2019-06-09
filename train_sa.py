@@ -11,7 +11,7 @@ import torch.optim.lr_scheduler as scheduler
 from torch.utils.data import DataLoader
 
 from tool.log import LogManager
-from tool.loss import nllloss, l2loss, calc_err, l1loss
+from tool.loss import nllloss, l2loss, calc_err
 from tool.kaldi.kaldi_manager import read_feat
 
 #####################################################################
@@ -57,8 +57,8 @@ wide_loader = DataLoader(wide_set, batch_size=batch_size, shuffle=True)
 
 Gn2w = net.Generator_CNN(feat_dim=120)
 Gw2n = net.Generator_CNN(feat_dim=120)
-Dn = net.Discriminator_CNN(feat_dim=120, frame_dim=128, hidden_dim=512)
-Dw = net.Discriminator_CNN(feat_dim=120, frame_dim=128, hidden_dim=512)
+Dn = net.Discriminator_MLP(feat_dim=120, hidden_dim=512)
+Dw = net.Discriminator_MLP(feat_dim=120, hidden_dim=512)
 
 Gn2w_opt = optim.Adam(Gn2w.parameters(), lr=lr_g)
 Gw2n_opt = optim.Adam(Gw2n.parameters(), lr=lr_g)
@@ -136,14 +136,14 @@ for epoch in range(epochs):
 
         # Cycle consistent training
         n2w2n = Gw2n(n2w); w2n2w = Gn2w(w2n)
-        cyc1 = l1loss(n2w2n, n); cyc2 = l1loss(w2n2w, w)
+        cyc1 = l2loss(n2w2n, n); cyc2 = l2loss(w2n2w, w)
         cyc = cyc1 + cyc2
 
         # Id traning
         total =adv_coef * adv + cyc_coef * cyc
         if id_coef > 0.0:
             w2w = Gn2w(w); n2n = Gw2n(n)
-            idl1 = l1loss(w2w, w); idl2 = l1loss(n2n, n)
+            idl1 = l2loss(w2w, w); idl2 = l2loss(n2n, n)
             idl =  idl1 + idl2
             total += id_coef * idl
         
@@ -180,12 +180,12 @@ for epoch in range(epochs):
 
             # Cycle consistent stat
             n2w2n = Gw2n(n2w)
-            cyc = l1loss(n2w2n, n)
+            cyc = l2loss(n2w2n, n)
 
             # Id stat
             if id_coef > 0.0:
                 n2n = Gw2n(n)
-                idl = l1loss(n2n, n)
+                idl = l2loss(n2n, n)
 
             # Save to Log
             lm.add_torch_stat("D_adv", D_adv)
