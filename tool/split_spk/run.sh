@@ -76,7 +76,5 @@ for dType in adapt; do
     ${package_dir}/validate_data_dir.sh $outDir || exit 1;
 
     # 9. copy to ark
-    copy-feats scp,s:$outDir/feats.scp ark:$outDir/feats.scp_tmp
-    mv $outDir/feats.scp_tmp $outDir/feats.scp
-    cp $outDir/feats.scp $outDir/feats.ark
+    copy-feats scp,s:$outDir/feats.scp ark:$outDir/feats.ark
 done

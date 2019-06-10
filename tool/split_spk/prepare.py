@@ -2,40 +2,6 @@
 #coding=utf8
 
 """
-Input:  1. $in_dir/spk2utt
-        2. $out_dir
-        3. $envPath
-ex) original_data_dir = data/test
-   data_root_for_adaptation = data/adaptation
-
-Output: 1. $data_root_for_adaptation/{adapt, dev, test}/uttlist
-
-Requirements)
-1. split.conf
-  - adapt_txt_num: 4
-  - dev_txt_num: 2
-  - test_txt_num: 2
-  - start_idx: 0
-
-Process) 
-0. Read configuration
-1. Read spk2utt
-2. Save into {spkId: txtList}
-3. Get [adapt, dev, test] uttList set
-    for each txtList in spkId
-        0) check if split is valid, if not raise error
-        1) adapt_start ~ adapt_end: append utt to adapt set
-            adapt_start: (start_idx) % total_len
-            adapt_end: (start_idx+adapt_txt_num) % total_len
-        2) dev_start ~ dev_end: append utt to dev set
-            dev_start: (adapt_end) % total_len
-            dev_end: (adapt_end+dev_txt_num) % total_len
-        3) test_start ~ test_end: append utt to test set
-            test_start: (dev_end) % total_len
-            test_end: (dev_end+test_txt_num) % total_len
-4. sort each set
-5. make {adapt, dev, test} dir
-6. save to {adapt, dev, test}/uttlist
 """
 import os
 import sys
