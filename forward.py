@@ -26,7 +26,7 @@ loss_per = 0
 os.system("mkdir -p " + si_dir + "/decode")
 
 # data
-test_feat = read_feat(data_dir+"/feats.ark", delta=True)
+test_feat = read_feat(data_dir+"/feats.ark", cmvn=True, delta=True)
 test_utts = list(test_feat.keys())
 test_utts.sort()
 # ivector

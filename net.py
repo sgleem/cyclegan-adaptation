@@ -14,6 +14,8 @@ class GRU_HMM(nn.Module):
 
         self.GRU = nn.GRU(input_size = input_dim, hidden_size = hidden_dim, 
             num_layers=num_layers, dropout=0.2, bidirectional=True)
+        # self.liGRU = liGRU(input_size = input_dim, hidden_size = hidden_dim, 
+        #     num_layers=num_layers, bidirectional=True)
         self.HMM = nn.Linear(hidden_dim * 2, output_dim)
         
     def forward(self, x):
@@ -21,6 +23,7 @@ class GRU_HMM(nn.Module):
         if xdim == 2:
             x = torch.unsqueeze(x, dim=1)
         h, _ = self.GRU(x)
+        # h, _ = self.liGRU(x)
         out = self.HMM(h)
         out = F.log_softmax(out, dim=2)
         if xdim == 2:
@@ -51,18 +54,18 @@ class Generator_CNN(nn.Module):
         feat_dim = kwargs.get("feat_dim", 120)
 
         self.downsample = nn.Sequential(
-            ConvSample(inC=feat_dim, outC=feat_dim*2, k=5, s=1, p=2),
-            ConvSample(inC=feat_dim*2, outC=feat_dim*4, k=5, s=1, p=2)
+            ConvSample(inC=feat_dim, outC=128, k=5, s=1, p=2),
+            ConvSample(inC=128, outC=256, k=5, s=1, p=2)
         )
         self.res = nn.Sequential(
-            Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
-            Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
-            Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1),
-            Residual(inC=feat_dim*4, hiddenC=feat_dim*8, k=3, s=1, p=1)
+            Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
+            Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
+            Residual(inC=256, hiddenC=512, k=3, s=1, p=1),
+            Residual(inC=256, hiddenC=512, k=3, s=1, p=1)
         )
         self.upsample = nn.Sequential(
-            ConvSample(inC=feat_dim*4, outC=feat_dim*2, k=5, s=1, p=2),
-            ConvSample(inC=feat_dim*2, outC=feat_dim, k=5, s=1, p=2),
+            ConvSample(inC=256, outC=128, k=5, s=1, p=2),
+            ConvSample(inC=128, outC=feat_dim, k=5, s=1, p=2),
         )
         self.out = nn.Linear(feat_dim, feat_dim)
 
@@ -83,14 +86,11 @@ class Discriminator_CNN(nn.Module):
         hidden_dim = kwargs.get("hidden_dim", 512)
         
         self.downsample = nn.Sequential(
-            ConvSample2D(inC=1, outC=4, k=4, s=2, p=1),
-            ConvSample2D(inC=4, outC=4, k=3, s=1, p=1),
-            ConvSample2D(inC=4, outC=16, k=4, s=2, p=1),
-            ConvSample2D(inC=16, outC=16, k=3, s=1, p=1),
-            ConvSample2D(inC=16, outC=64, k=4, s=2, p=1)
+            ConvSample(inC=feat_dim, outC=128, k=5, s=1, p=2),
+            ConvSample(inC=128, outC=256, k=5, s=1, p=2)
         )
         self.out = nn.Sequential(
-            nn.Linear(feat_dim * frame_dim, hidden_dim),
+            nn.Linear(frame_dim * 256, hidden_dim),
             nn.LeakyReLU(),
             nn.Linear(hidden_dim, 1)
         )

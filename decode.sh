@@ -1,4 +1,5 @@
 #!/bin/bash
+# gmm_dir=gmm_hmm/timit
 gmm_dir=gmm_hmm/timit
 # gmm_dir=gmm_hmm/wsj
 

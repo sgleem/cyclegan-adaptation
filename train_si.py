@@ -19,10 +19,10 @@ from tool.kaldi.kaldi_manager import read_feat, read_ali
 #####################################################################
 parser = argparse.ArgumentParser()
 parser.add_argument("--train_feat_dir", default="data/timit/train", type=str)
-parser.add_argument("--train_ali_dir", default="ali/timit/train", type=str)
+parser.add_argument("--train_ali_dir", default="ali/timit_sgmm/train", type=str)
 parser.add_argument("--dev_feat_dir", default="data/timit/dev", type=str)
-parser.add_argument("--dev_ali_dir", default="ali/timit/dev", type=str)
-parser.add_argument("--model_dir", default="model/gru_timit", type=str)
+parser.add_argument("--dev_ali_dir", default="ali/timit_sgmm/dev", type=str)
+parser.add_argument("--model_dir", default="model/gru_sgmm", type=str)
 parser.add_argument("--rank", default=0, type=int)
 parser.add_argument("--size", default=1, type=int)
 args = parser.parse_args()
@@ -36,13 +36,13 @@ model_dir = args.model_dir
 epochs = 100
 batch_size = 1
 lr = 0.0001
-pdf_num = 1920
+pdf_num = 5657
 #####################################################################
 os.system("mkdir -p " + model_dir + "/parm")
 os.system("mkdir -p " + model_dir + "/opt")
 
-train_feat = read_feat(train_feat_dir+"/feats.ark", delta=True)
-dev_feat = read_feat(dev_feat_dir+"/feats.ark", delta=True)
+train_feat = read_feat(train_feat_dir+"/feats.ark", cmvn=True, delta=True)
+dev_feat = read_feat(dev_feat_dir+"/feats.ark", cmvn=True, delta=True)
 
 train_ali = read_ali(train_ali_dir+"/ali.*.gz", train_ali_dir+"/final.mdl")
 dev_ali = read_ali(dev_ali_dir+"/ali.*.gz", dev_ali_dir+"/final.mdl")
@@ -52,8 +52,7 @@ dev_utt = list(dev_feat.keys())
 
 # sort by frame length
 train_utt.sort(key=lambda x: len(train_feat[x]))
-
-model = net.GRU_HMM(input_dim=120, hidden_dim=320, num_layers=5, output_dim=pdf_num)
+model = net.GRU_HMM(input_dim=120, hidden_dim=512, num_layers=5, output_dim=pdf_num)
 torch.save(model, model_dir+"/init.pt")
 model.cuda()
 model_opt = opt.Adam(model.parameters(), lr=lr)
@@ -73,7 +72,7 @@ with open(model_dir+"/prior.pk", 'wb') as f:
 # model training
 for epoch in range(epochs):
     print("Epoch",epoch)
-    # random.shuffle(train_utt)
+    random.shuffle(train_utt)
     model.train()
     lm.init_stat()
     # for utt_id in train_utt:
