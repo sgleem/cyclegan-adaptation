@@ -41,8 +41,8 @@ pdf_num = 5657
 os.system("mkdir -p " + model_dir + "/parm")
 os.system("mkdir -p " + model_dir + "/opt")
 
-train_feat = read_feat(train_feat_dir+"/feats.ark", cmvn=True, delta=True)
-dev_feat = read_feat(dev_feat_dir+"/feats.ark", cmvn=True, delta=True)
+train_feat = read_feat(train_feat_dir+"/feats.ark", delta=True)
+dev_feat = read_feat(dev_feat_dir+"/feats.ark", delta=True)
 
 train_ali = read_ali(train_ali_dir+"/ali.*.gz", train_ali_dir+"/final.mdl")
 dev_ali = read_ali(dev_ali_dir+"/ali.*.gz", dev_ali_dir+"/final.mdl")

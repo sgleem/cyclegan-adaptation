@@ -18,7 +18,7 @@ class GRU_HMM(nn.Module):
         #     num_layers=num_layers, bidirectional=True)
         self.HMM = nn.Linear(hidden_dim * 2, output_dim)
         
-    def forward(self, x):
+    def forward(self, x, get_hidden=False):
         xdim = len(list(x.size()))
         if xdim == 2:
             x = torch.unsqueeze(x, dim=1)
@@ -28,7 +28,12 @@ class GRU_HMM(nn.Module):
         out = F.log_softmax(out, dim=2)
         if xdim == 2:
             out = torch.squeeze(out, dim=1)
-        return out
+            h = torch.squeeze(h, dim=1)
+
+        if get_hidden:
+            return out, h
+        else:
+            return out
 
 class ivecNN(nn.Module):
     def __init__(self, *args, **kwargs):
@@ -95,7 +100,7 @@ class Discriminator_CNN(nn.Module):
             nn.Linear(hidden_dim, 1)
         )
     def forward(self, x):
-        x = x.unsqueeze(dim=1)
+        x = x.permute(0, 2, 1)
         h = self.downsample(x)
         h = torch.flatten(h, start_dim=1)
         out = self.out(h)

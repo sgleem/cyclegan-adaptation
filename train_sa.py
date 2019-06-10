@@ -103,9 +103,9 @@ for epoch in range(epochs):
         wide_true = Dw(w); wide_false = Dw(n2w)
         narrow_true = Dn(n); narrow_false = Dn(w2n)
 
-        adv_t = torch.mean(wide_true) + torch.mean(narrow_true)
-        adv_f = torch.mean(wide_false) + torch.mean(narrow_false)
-        adv = adv_f - adv_t
+        adv_t = l2loss(wide_true, 1) / 2 + l2loss(narrow_true, 1) / 2
+        adv_f = l2loss(wide_false, 0) / 2 + l2loss(narrow_false, 0) / 2
+        adv = adv_f + adv_t
 
         # Update Parameter
         total = adv_coef * adv
@@ -127,12 +127,11 @@ for epoch in range(epochs):
         n2w = Gn2w(n)
         w2n = Gw2n(w)
         # Adversarial training
-        wide_true = Dw(w); wide_false = Dw(n2w)
-        narrow_true = Dn(n); narrow_false = Dn(w2n)
+        wide_false = Dw(n2w)
+        narrow_false = Dn(w2n)
 
-        adv_t = torch.mean(wide_true) + torch.mean(narrow_true)
-        adv_f = torch.mean(wide_false) + torch.mean(narrow_false)
-        adv = adv_t - adv_f
+        adv_f = l2loss(wide_false, 1) / 2 + l2loss(narrow_false, 1) / 2
+        adv = adv_f
 
         # Cycle consistent training
         n2w2n = Gw2n(n2w); w2n2w = Gn2w(w2n)
@@ -173,10 +172,10 @@ for epoch in range(epochs):
             n = torch.Tensor(n).cuda().float()
 
             n2w = Gn2w(n)
-            wide_false = Dw(n2w)
+            wide_false = Dw(n2w); noise_true = Dn(n)
 
-            D_adv = torch.mean(wide_false)
-            G_adv = -1 * D_adv
+            D_adv = l2loss(wide_false, 0) / 2 + l2loss(noise_true, 1) / 2
+            G_adv = l2loss(wide_false, 1)
 
             # Cycle consistent stat
             n2w2n = Gw2n(n2w)
