@@ -33,8 +33,8 @@ loss_per = args.loss_per
 #####################################################################
 epochs = 1000
 batch_size = 64
-lr_g = 0.00002
-lr_d = 0.00001
+lr_g = 0.0002
+lr_d = 0.0001
 
 change_epoch = 200
 save_per_epoch = 5
@@ -57,8 +57,8 @@ wide_loader = DataLoader(wide_set, batch_size=batch_size, shuffle=True)
 
 Gn2w = net.Generator_CNN(feat_dim=120)
 Gw2n = net.Generator_CNN(feat_dim=120)
-Dn = net.Discriminator_MLP(feat_dim=120, hidden_dim=512)
-Dw = net.Discriminator_MLP(feat_dim=120, hidden_dim=512)
+Dn = net.Discriminator_CNN(feat_dim=120, hidden_dim=512)
+Dw = net.Discriminator_CNN(feat_dim=120, hidden_dim=512)
 
 Gn2w_opt = optim.Adam(Gn2w.parameters(), lr=lr_g)
 Gw2n_opt = optim.Adam(Gw2n.parameters(), lr=lr_g)
@@ -92,10 +92,8 @@ for epoch in range(epochs):
         model.train()
     # D & SPK phase
     for narrow_utt, wide_utt in zip(adapt_loader, wide_loader):
-        n = pp.simulate_packet_loss(narrow_utt.numpy(), loss_per=loss_per, minibatch=True)
-        n = torch.Tensor(n).cuda().float()
-        w = pp.simulate_packet_loss(wide_utt.numpy(), loss_per=loss_per, minibatch=True)
-        w = torch.Tensor(w).cuda().float()
+        n = torch.Tensor(narrow_utt).cuda().float()
+        w = torch.Tensor(wide_utt).cuda().float()
 
         n2w = Gn2w(n)
         w2n = Gw2n(w)
@@ -119,10 +117,8 @@ for epoch in range(epochs):
         lm.add_torch_stat("D_adv", adv)
     # G phase
     for narrow_utt, wide_utt in zip(adapt_loader, wide_loader):
-        n = pp.simulate_packet_loss(narrow_utt.numpy(), loss_per=loss_per, minibatch=True)
-        n = torch.Tensor(n).cuda().float()
-        w = pp.simulate_packet_loss(wide_utt.numpy(), loss_per=loss_per, minibatch=True)
-        w = torch.Tensor(w).cuda().float()
+        n = torch.Tensor(narrow_utt).cuda().float()
+        w = torch.Tensor(wide_utt).cuda().float()
 
         n2w = Gn2w(n)
         w2n = Gw2n(w)
@@ -139,12 +135,12 @@ for epoch in range(epochs):
         cyc = cyc1 + cyc2
 
         # Id traning
-        total =adv_coef * adv + cyc_coef * cyc
+        total = (adv_coef * adv) + (cyc_coef * cyc)
         if id_coef > 0.0:
             w2w = Gn2w(w); n2n = Gw2n(n)
             idl1 = l2loss(w2w, w); idl2 = l2loss(n2n, n)
             idl =  idl1 + idl2
-            total += id_coef * idl
+            total += (id_coef * idl)
         
         # Update Parameter
         for opt in [Gn2w_opt, Gw2n_opt]:
@@ -168,8 +164,7 @@ for epoch in range(epochs):
     with torch.no_grad():
         # Accumulate adv, cyc, id loss
         for dev_utt in dev_loader:
-            n = pp.simulate_packet_loss(narrow_utt.numpy(), loss_per=loss_per, minibatch=True)
-            n = torch.Tensor(n).cuda().float()
+            n = torch.Tensor(dev_utt).cuda().float()
 
             n2w = Gn2w(n)
             wide_false = Dw(n2w); noise_true = Dn(n)

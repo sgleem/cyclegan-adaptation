@@ -24,9 +24,8 @@ sa_dir = args.sa_dir
 loss_per = 0
 
 os.system("mkdir -p " + si_dir + "/decode")
-
 # data
-test_feat = read_feat(data_dir+"/feats.ark", cmvn=True, delta=True)
+test_feat = read_feat(data_dir+"/feats.ark", cmvn=False, delta=True)
 test_utts = list(test_feat.keys())
 test_utts.sort()
 # ivector
@@ -60,10 +59,12 @@ kaldi_fp = kio.open_or_fd(si_dir+"/decode/lld.ark", 'wb')
 with torch.no_grad():
     for utt_id in test_utts:
         feat_mat = test_feat[utt_id]
-        feat_mat = pp.simulate_packet_loss(feat_mat, loss_per=loss_per)
+        feat_mat = pp.matrix_normalize(feat_mat, axis=1, fcn_type="mean")#simulate_packet_loss(feat_mat, loss_per=loss_per)
         if sa_dir is not "":
             x = torch.Tensor([feat_mat]).cuda().float()
+            # print(x)
             x = model_sa(x)[0]
+            # print(x)
         else:
             x = torch.Tensor(feat_mat).cuda().float()
         # for sat

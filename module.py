@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.init as init
 import torch.nn.functional as F
+import numpy as np
 
 class ConvSample(nn.Module):
     def __init__(self, *args, **kwargs):
@@ -226,6 +227,86 @@ class liGRU(nn.Module):
         x = inp_x
 
         return x, h_history
+
+class SDPA(nn.Module):
+    # Q (previous feature) (N, T or 1, 120)
+    # K (input sequence) (N, T, 120)
+    # V (input sequence)
+    def __init__(self, *args, **kwargs):
+        super(SDPA, self).__init__()
+    def forward(self, Q, K=None, V=None):
+        if K is None:
+            K = Q
+        if V is None:
+            V = K
+        
+        # Q(N, 1, 120) * K(N, T, 120) => (N, 1, T)
+        feat_dim = Q.size()[2]
+        K_T = K.permute(0, 2, 1)
+        attn = torch.bmm(Q, K_T)
+        attn = attn / np.sqrt(feat_dim)
+
+        # Apply Softmax
+        attn = F.softmax(attn, dim=1)
+
+        # Attn (N, 1, T) * V(N, T, 120)
+        out = torch.bmm(attn, V)
+        return out
+
+class MultiHeadAttention(nn.Module):
+    # Q (previous feature) (N, T or 1, 120)
+    # K (input sequence) (N, T, 120)
+    # V (input sequence)
+    def __init__(self, *args, **kwargs):
+        super(MultiHeadAttention, self).__init__()
+        input_size = kwargs.get("input_size", 120)
+        hidden_size = kwargs.get("hidden_size", 512)
+        n_head = kwargs.get("n_head", 8)
+        self.Wq_set = nn.ModuleList([])
+        self.Wk_set = nn.ModuleList([])
+        self.Wv_set = nn.ModuleList([])
+        self.SDPA_set = nn.ModuleList([])
+        for h in range(n_head):
+            self.Wq_set.append(nn.Linear(input_size, hidden_size))
+            self.Wk_set.append(nn.Linear(input_size, hidden_size))
+            self.Wv_set.append(nn.Linear(input_size, hidden_size))
+            self.SDPA_set.append(SDPA())
+        
+        self.out = nn.Linear(hidden_size * n_head, input_size)
+    def forward(self, Q, K=None, V=None):
+        if K is None:
+            K = Q
+        if V is None:
+            V = K
+        h = []
+        for idx, SDPA in enumerate(self.SDPA_set):
+            curQ = self.Wq_set[idx](Q)
+            curK = self.Wk_set[idx](K)
+            curV = self.Wv_set[idx](V)
+            cur_sdpa = SDPA(curQ, curK, curV) # (N, 1 or T, 512)
+            h.append(cur_sdpa)
+        h = torch.cat(h, dim=2) # (N, 1 or T, 512 * 8)
+        mha_out = self.out(h) # (N, 1 or T, 120)
+
+        result = mha_out + Q # (N, 1 or T, 120)
+        result = nn.LayerNorm(result.size())(result)
+
+class FFN(nn.Module):
+    def __init__(self, *args, **kwargs):
+        super(FFN, self).__init__()
+        input_size = kwargs.get("input_size", 120)
+        hidden_size = kwargs.get("hidden_size", 1024)
+
+        self.relu = nn.Sequential(
+            nn.Linear(input_size, hidden_size),
+            nn.ReLU()
+        )
+        self.out = nn.Linear(hidden_size, input_size)
+    def forward(self, x):
+        h = self.relu(x)
+        out = self.out(h)
+
+        return out
 
 
 

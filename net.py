@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from module import ConvSample, Residual,Residual_Cat, ConvSample2D, ReLU, liGRU
+import module as mod
 
 class GRU_HMM(nn.Module):
     def __init__(self, *args, **kwargs):
@@ -14,8 +15,6 @@ class GRU_HMM(nn.Module):
 
         self.GRU = nn.GRU(input_size = input_dim, hidden_size = hidden_dim, 
             num_layers=num_layers, dropout=0.2, bidirectional=True)
-        # self.liGRU = liGRU(input_size = input_dim, hidden_size = hidden_dim, 
-        #     num_layers=num_layers, bidirectional=True)
         self.HMM = nn.Linear(hidden_dim * 2, output_dim)
         
     def forward(self, x, get_hidden=False):
@@ -23,7 +22,6 @@ class GRU_HMM(nn.Module):
         if xdim == 2:
             x = torch.unsqueeze(x, dim=1)
         h, _ = self.GRU(x)
-        # h, _ = self.liGRU(x)
         out = self.HMM(h)
         out = F.log_softmax(out, dim=2)
         if xdim == 2:
@@ -76,10 +74,10 @@ class Generator_CNN(nn.Module):
 
     def forward(self, x):
         x = x.permute(0, 2, 1)
-        h = self.downsample(x)
-        h = self.res(h)
-        h = self.upsample(h)
-        h = h.permute(0, 2, 1)
+        h1 = self.downsample(x)
+        h2 = self.res(h1)
+        h3 = self.upsample(h2)
+        h = h3.permute(0, 2, 1)
         out = self.out(h)
         
         return out
@@ -95,14 +93,14 @@ class Discriminator_CNN(nn.Module):
             ConvSample(inC=128, outC=256, k=5, s=1, p=2)
         )
         self.out = nn.Sequential(
-            nn.Linear(frame_dim * 256, hidden_dim),
+            nn.Linear(256, hidden_dim),
             nn.LeakyReLU(),
             nn.Linear(hidden_dim, 1)
         )
     def forward(self, x):
         x = x.permute(0, 2, 1)
         h = self.downsample(x)
-        h = torch.flatten(h, start_dim=1)
+        h = h.permute(0, 2, 1)
         out = self.out(h)
         out = torch.sigmoid(out)
         
@@ -407,4 +405,50 @@ class MeanTranslator(nn.Module):
         c2t_var = self.x_var(inp)
         sa_x = x + c2t_var
         return sa_x, si_x
+
+############################################################
+# 06.11
+############################################################
+class SelfAttnEncoder(nn.Module):
+    def __init__(self, *args, **kwargs):
+        super(SelfAttnEncoder, self).__init__()
+        input_size = kwargs.get("input_size", 120)
+        mha_size = kwargs.get("mha_size", 512)
+        ffn_size = kwargs.get("ffn_size", 1024)
+
+        enc_num = kwargs.get("enc_num", 6)
+        n_head = kwargs.get("n_head", 8)
+        self.mha_module = nn.ModuleList([mod.MultiHeadAttention(input_size=input_size, hidden_size=mha_size, n_head=n_head) * enc_num])
+        self.ffn_module = nn.ModuleList([mod.FFN(input_size=input_size, hidden_size=ffn_size) * enc_num])
+        
+    def forward(self, x):
+        # input (N, seq, input_dim)
+        h = x
+        for idx, mha in enumerate(self.mha_module):
+            h = mha(Q=h, K=h, V=h)
+            h = self.ffn_module[idx](h)
+        
+        return h
+
+class SelfAttnDecoder(nn.Module):
+    def __init__(self, *args, **kwargs):
+        super(SelfAttnDecoder, self).__init__()
+        input_size = kwargs.get("input_size", 120)
+        mha_size = kwargs.get("mha_size", 512)
+        ffn_size = kwargs.get("ffn_size", 1024)
+
+        enc_num = kwargs.get("enc_num", 6)
+        n_head = kwargs.get("n_head", 8)
+        self.mha_module = nn.ModuleList([mod.MultiHeadAttention(input_size=input_size, hidden_size=mha_size, n_head=n_head) * enc_num])
+        self.ffn_module = nn.ModuleList([mod.FFN(input_size=input_size, hidden_size=ffn_size) * enc_num])
+        
+    def forward(self, x):
+        # input (N, seq, input_dim)
+        h = x
+        for idx, mha in enumerate(self.mha_module):
+            h = mha(Q=h, K=h, V=h)
+            h = self.ffn_module[idx](h)
+        
+        return h
+        
 
