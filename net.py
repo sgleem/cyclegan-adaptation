@@ -11,10 +11,11 @@ class GRU_HMM(nn.Module):
         input_dim = kwargs.get("input_dim", 120)
         hidden_dim = kwargs.get("hidden_dim", 465)
         num_layers = kwargs.get("num_layers", 5)
+        dropout = kwargs.get("dropout", 0.2)
         output_dim = kwargs.get("output_dim", 1920)
 
         self.GRU = nn.GRU(input_size = input_dim, hidden_size = hidden_dim, 
-            num_layers=num_layers, dropout=0.2, bidirectional=True)
+            num_layers=num_layers, dropout=dropout, bidirectional=True)
         self.HMM = nn.Linear(hidden_dim * 2, output_dim)
         
     def forward(self, x, get_hidden=False):

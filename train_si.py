@@ -33,7 +33,7 @@ dev_feat_dir = args.dev_feat_dir
 dev_ali_dir = args.dev_ali_dir
 model_dir = args.model_dir
 #####################################################################
-epochs = 22
+epochs = 30
 batch_size = 1
 lr = 0.0001
 pdf_num = 5657 # 1920(timit tri3) 5626(ntimit NB) 5657(ntimit WB)
@@ -41,8 +41,8 @@ pdf_num = 5657 # 1920(timit tri3) 5626(ntimit NB) 5657(ntimit WB)
 os.system("mkdir -p " + model_dir + "/parm")
 os.system("mkdir -p " + model_dir + "/opt")
 
-train_feat = read_feat(train_feat_dir+"/feats.ark", delta=True)
-dev_feat = read_feat(dev_feat_dir+"/feats.ark", delta=True)
+train_feat = read_feat(train_feat_dir+"/feats.ark", utt_cmvn=True, delta=True)
+dev_feat = read_feat(dev_feat_dir+"/feats.ark", utt_cmvn=True, delta=True)
 
 train_ali = read_ali(train_ali_dir+"/ali.*.gz", train_ali_dir+"/final.mdl")
 dev_ali = read_ali(dev_ali_dir+"/ali.*.gz", dev_ali_dir+"/final.mdl")
@@ -52,7 +52,7 @@ dev_utt = list(dev_feat.keys())
 
 # sort by frame length
 train_utt.sort(key=lambda x: len(train_feat[x]))
-model = net.GRU_HMM(input_dim=120, hidden_dim=512, num_layers=4, output_dim=pdf_num)
+model = net.GRU_HMM(input_dim=120, hidden_dim=512, num_layers=5, dropout=0.3, output_dim=pdf_num)
 torch.save(model, model_dir+"/init.pt")
 model.cuda()
 model_opt = opt.Adam(model.parameters(), lr=lr)
@@ -70,9 +70,9 @@ prior /= np.sum(prior)
 with open(model_dir+"/prior.pk", 'wb') as f:
     pk.dump(prior, f)
 
-for storage in [train_feat, dev_feat]:
-    for utt_id, feat_mat in storage.items():
-        storage[utt_id] = pp.matrix_normalize(feat_mat, axis=1, fcn_type="mean")
+# for storage in [train_feat, dev_feat]:
+#     for utt_id, feat_mat in storage.items():
+#         storage[utt_id] = pp.matrix_normalize(feat_mat, axis=1, fcn_type="mean")
 
 # model training
 for epoch in range(epochs):

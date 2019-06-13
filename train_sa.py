@@ -43,9 +43,9 @@ adv_coef = 1.0; cyc_coef = 10.0; id_coef = 5.0
 torch.cuda.empty_cache()
 os.system("mkdir -p "+ model_dir +"/parm")
 
-adapt_storage = read_feat(adapt_dir+"/feats.ark", delta=True)
-dev_storage = read_feat(dev_dir+"/feats.ark", delta=True)
-wide_storage = read_feat(wide_dir+"/feats.ark", delta=True)
+adapt_storage = read_feat(adapt_dir+"/feats.ark", utt_cmvn=True, delta=True)
+dev_storage = read_feat(dev_dir+"/feats.ark", utt_cmvn=True, delta=True)
+wide_storage = read_feat(wide_dir+"/feats.ark", utt_cmvn=True, delta=True)
 
 adapt_set = pp.make_cnn_dataset(adapt_storage, input_size=128, step_size=64); print(len(adapt_set))
 dev_set = pp.make_cnn_dataset(dev_storage, input_size=128, step_size=64); print(len(dev_set))
