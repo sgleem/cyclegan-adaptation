@@ -77,6 +77,8 @@ def make_cnn_dataset(utt_dict, input_size=128, step_size=64):
         for start_idx in range(0, frame_len-input_size+1, step_size):
             segment = frame_mat[start_idx:start_idx+input_size]
             segment_set.append(segment)
+        segment = frame_mat[frame_len-input_size:]
+        segment_set.append(segment)
     return segment_set
 
 def make_spk_cnn_set(utt_dict, frame_size=128, step_size=64):

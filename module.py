@@ -228,34 +228,31 @@ class liGRU(nn.Module):
 
         return x, h_history
 
-class SDPA(nn.Module):
-    # Q (previous feature) (N, T or 1, 120)
-    # K (input sequence) (N, T, 120)
-    # V (input sequence)
-    def __init__(self, *args, **kwargs):
-        super(SDPA, self).__init__()
-    def forward(self, Q, K=None, V=None):
+def SDPA(self, Q, K=None, V=None):
         if K is None:
             K = Q
         if V is None:
             V = K
         
         # Q(N, 1, 120) * K(N, T, 120) => (N, 1, T)
+        Q = Q.permute(1, 0, 2).contiguous(); K = K.permute(1, 0, 2).contiguous(); V = V.permute(1, 0, 2).contiguous()
+
         feat_dim = Q.size()[2]
-        K_T = K.permute(0, 2, 1)
+        K_T = K.permute(0, 2, 1).contiguous()
         attn = torch.bmm(Q, K_T)
         attn = attn / np.sqrt(feat_dim)
 
         # Apply Softmax
         attn = F.softmax(attn, dim=1)
 
-        # Attn (N, 1, T) * V(N, T, 120)
+        # Attn (N, 1 or T, T) * V(N, T, 120) -> (N, 1 or T, 120)
         out = torch.bmm(attn, V)
+        out = out.permute(1, 0, 2)
         return out
 
 class MultiHeadAttention(nn.Module):
-    # Q (previous feature) (N, T or 1, 120)
-    # K (input sequence) (N, T, 120)
+    # Q (previous feature) (T or 1, N, 120)
+    # K (input sequence) (T, N, 120)
     # V (input sequence)
     def __init__(self, *args, **kwargs):
         super(MultiHeadAttention, self).__init__()
@@ -265,31 +262,32 @@ class MultiHeadAttention(nn.Module):
         self.Wq_set = nn.ModuleList([])
         self.Wk_set = nn.ModuleList([])
         self.Wv_set = nn.ModuleList([])
-        self.SDPA_set = nn.ModuleList([])
         for h in range(n_head):
             self.Wq_set.append(nn.Linear(input_size, hidden_size))
             self.Wk_set.append(nn.Linear(input_size, hidden_size))
             self.Wv_set.append(nn.Linear(input_size, hidden_size))
-            self.SDPA_set.append(SDPA())
         
         self.out = nn.Linear(hidden_size * n_head, input_size)
+        self.norm = nn.LayerNorm(input_size, elementwise_affine=False)
+        self.n_head = n_head
     def forward(self, Q, K=None, V=None):
         if K is None:
             K = Q
         if V is None:
             V = K
         h = []
-        for idx, SDPA in enumerate(self.SDPA_set):
+        for idx in range(self.n_head):
             curQ = self.Wq_set[idx](Q)
             curK = self.Wk_set[idx](K)
             curV = self.Wv_set[idx](V)
-            cur_sdpa = SDPA(curQ, curK, curV) # (N, 1 or T, 512)
+            cur_sdpa = SDPA(curQ, curK, curV) # (1 or T, N, 512)
             h.append(cur_sdpa)
-        h = torch.cat(h, dim=2) # (N, 1 or T, 512 * 8)
-        mha_out = self.out(h) # (N, 1 or T, 120)
+        h = torch.cat(h, dim=2) # (1 or T, N, 512 * 8)
+        mha_out = self.out(h) # (1 or T, N, 120)
 
-        result = mha_out + Q # (N, 1 or T, 120)
-        result = nn.LayerNorm(result.size())(result)
+        result = mha_out + V # (1 or T, N, 120)
+        result = self.norm(result)
+        return result
 
 class FFN(nn.Module):
     def __init__(self, *args, **kwargs):
@@ -302,9 +300,13 @@ class FFN(nn.Module):
             nn.ReLU()
         )
         self.out = nn.Linear(hidden_size, input_size)
+        self.norm = nn.LayerNorm(input_size, elementwise_affine=False)
     def forward(self, x):
         h = self.relu(x)
         out = self.out(h)
+
+        out = out + x
+        out = self.norm(out)
 
         return out
 

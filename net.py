@@ -94,8 +94,7 @@ class Discriminator_CNN(nn.Module):
             ConvSample(inC=128, outC=256, k=5, s=1, p=2)
         )
         self.out = nn.Sequential(
-            nn.Linear(256, hidden_dim),
-            nn.LeakyReLU(),
+            nn.Linear(256, hidden_dim), nn.LeakyReLU(),
             nn.Linear(hidden_dim, 1)
         )
     def forward(self, x):
@@ -419,16 +418,18 @@ class SelfAttnEncoder(nn.Module):
 
         enc_num = kwargs.get("enc_num", 6)
         n_head = kwargs.get("n_head", 8)
-        self.mha_module = nn.ModuleList([mod.MultiHeadAttention(input_size=input_size, hidden_size=mha_size, n_head=n_head) * enc_num])
-        self.ffn_module = nn.ModuleList([mod.FFN(input_size=input_size, hidden_size=ffn_size) * enc_num])
+        self.mha_module = nn.ModuleList([mod.MultiHeadAttention(input_size=input_size, hidden_size=mha_size, n_head=n_head)] * enc_num)
+        # self.mha_module = nn.ModuleList([nn.MultiheadAttention(embed_dim=mha_size, n_head=n_head) * enc_num])
+        self.ffn_module = mod.FFN(input_size=input_size, hidden_size=ffn_size)
         
     def forward(self, x):
-        # input (N, seq, input_dim)
+        # (T, 120) -> (T, 1, 120)
         h = x
-        for idx, mha in enumerate(self.mha_module):
+        h = h.unsqueeze(dim=1)
+        for mha in self.mha_module:
             h = mha(Q=h, K=h, V=h)
-            h = self.ffn_module[idx](h)
-        
+            h = self.ffn_module(h)
+        h = h.squeeze(dim=1)
         return h
 
 class SelfAttnDecoder(nn.Module):
@@ -438,18 +439,35 @@ class SelfAttnDecoder(nn.Module):
         mha_size = kwargs.get("mha_size", 512)
         ffn_size = kwargs.get("ffn_size", 1024)
 
-        enc_num = kwargs.get("enc_num", 6)
+        dec_num = kwargs.get("dec_num", 6)
         n_head = kwargs.get("n_head", 8)
-        self.mha_module = nn.ModuleList([mod.MultiHeadAttention(input_size=input_size, hidden_size=mha_size, n_head=n_head) * enc_num])
-        self.ffn_module = nn.ModuleList([mod.FFN(input_size=input_size, hidden_size=ffn_size) * enc_num])
+        self.mha_module_prev = nn.ModuleList([mod.MultiHeadAttention(input_size=input_size, hidden_size=mha_size, n_head=n_head)] * dec_num)
+        self.mha_module_enc = nn.ModuleList([mod.MultiHeadAttention(input_size=input_size, hidden_size=mha_size, n_head=n_head)] * dec_num)
+        self.ffn_module = mod.FFN(input_size=input_size, hidden_size=ffn_size)
         
-    def forward(self, x):
-        # input (N, seq, input_dim)
-        h = x
-        for idx, mha in enumerate(self.mha_module):
-            h = mha(Q=h, K=h, V=h)
-            h = self.ffn_module[idx](h)
-        
-        return h
+        self.threshold = nn.Sequential(
+            nn.Linear(input_size, 1),
+            nn.Sigmoid()
+        )
+
+
+        self.dec_num = dec_num
+    def forward(self, enc, prev):
+        # enc (T, 120) -> (T, 1, 120)
+        # prev (1, 120) -> (1, 1, 120)
+        enc = enc.unsqueeze(dim=1)
+        prev = prev.unsqueeze(dim=1)
+
+        h = prev
+        for idx in range(self.dec_num):
+            h = self.mha_module_prev[idx](Q=h, K=h, V=h)
+            h = self.mha_module_enc[idx](Q=h, K=enc, V=enc)
+            h = self.ffn_module(h)
+        end_prob = self.threshold(h) # (1, 1, 120) -> (1, 120) // (1, 1, 1) -> (1, 1)
+
+        h = h.squeeze(dim=1)
+        end_prob = end_prob.squeeze(dim=1)
+
+        return h, end_prob
         
 

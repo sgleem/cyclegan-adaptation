@@ -25,7 +25,7 @@ loss_per = 0
 
 os.system("mkdir -p " + si_dir + "/decode")
 # data
-test_feat = read_feat(data_dir+"/feats.ark", cmvn=False, delta=True)
+test_feat = read_feat(data_dir+"/feats.ark", delta=True)
 test_utts = list(test_feat.keys())
 test_utts.sort()
 # ivector
@@ -37,7 +37,8 @@ with open(si_dir+"/prior.pk", 'rb') as f:
     print(len(prior))
     prior = np.log(prior).reshape(-1, len(prior))
 # dnn
-dnn_am = torch.load(si_dir+"/init.pt")
+# dnn_am = torch.load(si_dir+"/init.pt")
+dnn_am = GRU_HMM(input_dim=120, hidden_dim=512, num_layers=4, dropout=0.3, output_dim=5657)
 dnn_am.load_state_dict(torch.load(si_dir+"/final.pt"))
 dnn_am.cuda()
 dnn_am.eval()
@@ -62,9 +63,9 @@ with torch.no_grad():
         feat_mat = pp.matrix_normalize(feat_mat, axis=1, fcn_type="mean")#simulate_packet_loss(feat_mat, loss_per=loss_per)
         if sa_dir is not "":
             x = torch.Tensor([feat_mat]).cuda().float()
-            # print(x)
+            print(len(x))
             x = model_sa(x)[0]
-            # print(x)
+            print(len(x))
         else:
             x = torch.Tensor(feat_mat).cuda().float()
         # for sat
