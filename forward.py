@@ -25,57 +25,53 @@ loss_per = 0
 
 os.system("mkdir -p " + si_dir + "/decode")
 # data
-test_feat = read_feat(data_dir+"/feats.ark", delta=True)
+test_feat = read_feat(data_dir+"/feats.ark", utt_cmvn=True, delta=True)
 test_utts = list(test_feat.keys())
 test_utts.sort()
-# ivector
-# test_ivecs = read_vec(data_dir+"/ivectors.ark")
 
 # prior
 with open(si_dir+"/prior.pk", 'rb') as f:
     prior = pk.load(f)
     print(len(prior))
     prior = np.log(prior).reshape(-1, len(prior))
+
 # dnn
-# dnn_am = torch.load(si_dir+"/init.pt")
-dnn_am = GRU_HMM(input_dim=120, hidden_dim=512, num_layers=4, dropout=0.3, output_dim=5657)
+dnn_am = torch.load(si_dir+"/init.pt")
 dnn_am.load_state_dict(torch.load(si_dir+"/final.pt"))
 dnn_am.cuda()
 dnn_am.eval()
-
-# for sat
-# ivecnn = torch.load(si_dir+"/init_ivecNN.pt")
-# ivecnn.load_state_dict(torch.load(si_dir+"/final_ivecNN.pt"))
-# ivecnn.cuda()
-# ivecnn.eval()
-
 if sa_dir is not "":
     model_sa = torch.load(sa_dir+"/init.pt")
     model_sa.load_state_dict(torch.load(sa_dir+"/final.pt"))
     model_sa.cuda()
     model_sa.eval()
     print(model_sa)
+# if sa_dir is not "":
+#     G = torch.load(sa_dir+"/init_G.pt")
+#     G.load_state_dict(torch.load(sa_dir+"/final_G.pt"))
+#     G.cuda()
+#     G.eval()
+
+#     P = torch.load(sa_dir+"/init_packet.pt")
+#     P.load_state_dict(torch.load(sa_dir+"/final_packet.pt"))
+#     P.cuda()
+#     P.eval()
 
 kaldi_fp = kio.open_or_fd(si_dir+"/decode/lld.ark", 'wb')
 with torch.no_grad():
     for utt_id in test_utts:
         feat_mat = test_feat[utt_id]
-        feat_mat = pp.matrix_normalize(feat_mat, axis=1, fcn_type="mean")#simulate_packet_loss(feat_mat, loss_per=loss_per)
         if sa_dir is not "":
             x = torch.Tensor([feat_mat]).cuda().float()
-            print(len(x))
             x = model_sa(x)[0]
-            print(len(x))
+        # if sa_dir is not "":
+        #     x = torch.Tensor([feat_mat]).cuda().float()
+        #     prob = P(x)[0]
+        #     recon = G(x)[0]
+        #     x = prob * x[0] + (1-prob) * recon
+
         else:
             x = torch.Tensor(feat_mat).cuda().float()
-        # for sat
-        # spk_id = utt_id.split("_")[0]
-        # ivec = test_ivecs[spk_id]
-        # ivec = torch.Tensor([ivec]).cuda().float()
-        # aux = ivecnn(ivec)
-        # aux = aux.expand_as(x)
-        # x = torch.cat((x,aux), dim=1)
-        # model_si
         y = dnn_am(x)
 
         post_prob = y.cpu().numpy()

@@ -283,10 +283,9 @@ class MultiHeadAttention(nn.Module):
             cur_sdpa = SDPA(curQ, curK, curV) # (1 or T, N, 512)
             h.append(cur_sdpa)
         h = torch.cat(h, dim=2) # (1 or T, N, 512 * 8)
-        mha_out = self.out(h) # (1 or T, N, 120)
-
-        result = mha_out + V # (1 or T, N, 120)
-        result = self.norm(result)
+        result = self.out(h) # (1 or T, N, 120)
+        # result = result + V # (1 or T, N, 120)
+        # result = self.norm(result)
         return result
 
 class FFN(nn.Module):
@@ -305,8 +304,8 @@ class FFN(nn.Module):
         h = self.relu(x)
         out = self.out(h)
 
-        out = out + x
-        out = self.norm(out)
+        # out = out + x
+        # out = self.norm(out)
 
         return out
 

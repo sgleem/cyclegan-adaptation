@@ -67,17 +67,17 @@ def matrix_normalize(origin_mat, axis=None, fcn_type="mean"):
     
     return norm_mat
 
-def make_cnn_dataset(utt_dict, input_size=128, step_size=64):
+def make_cnn_dataset(utt_dict, frame_size=128, step_size=64):
     segment_set = []
     for frame_mat in utt_dict.values():
         frame_len = len(frame_mat)
-        if frame_len < input_size:
+        if frame_len < frame_size:
             continue
         
-        for start_idx in range(0, frame_len-input_size+1, step_size):
-            segment = frame_mat[start_idx:start_idx+input_size]
+        for start_idx in range(0, frame_len-frame_size+1, step_size):
+            segment = frame_mat[start_idx:start_idx+frame_size]
             segment_set.append(segment)
-        segment = frame_mat[frame_len-input_size:]
+        segment = frame_mat[frame_len-frame_size:]
         segment_set.append(segment)
     return segment_set
 
@@ -101,6 +101,33 @@ def make_spk_cnn_set(utt_dict, frame_size=128, step_size=64):
         cnn_dict[spk_id] = segment_set
         
     return cnn_dict
+
+def make_cnn_dataset_and_lab(utt_dict, lab_dict, frame_size=128, step_size=64):
+    segment_set = []
+    for utt_id, feat_mat in utt_dict.items():
+        lab = lab_dict.get(utt_id, [])
+        lab_len = len(lab)
+        feat_len = len(feat_mat)
+        if lab_len == 0:
+            print("No label for", utt_id)
+            continue
+        if lab_len != feat_len:
+            print("Label length is different in", utt_id)
+            print("Feat :", feat_len,"/ Lab :", lab_len)
+            continue
+        
+        if feat_len < frame_size:
+            continue
+        for start_idx in range(0, feat_len-frame_size+1, step_size):
+            feat_segment = feat_mat[start_idx:start_idx+frame_size]
+            lab_segment = lab[start_idx:start_idx+frame_size]
+            segment = (feat_segment, lab_segment)
+            segment_set.append(segment)
+        feat_segment = feat_mat[feat_len-frame_size:]
+        lab_segment = lab[feat_len-frame_size:]
+        segment = (feat_segment, lab_segment)
+        segment_set.append(segment)        
+    return segment_set
 
 def simulate_packet_loss(feat_mat, loss_per=0, minibatch=False):
     assert 0 <= loss_per < 100, "Loss rate should be set within range [0, 100)"

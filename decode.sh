@@ -1,14 +1,13 @@
 #!/bin/bash
 # gmm_dir=gmm_hmm/timit
 gmm_dir=gmm_hmm/timit_sgmm
+# gmm_dir=gmm_hmm/ntimit
 # gmm_dir=gmm_hmm/wsj
 
 data_dir=$1
 model_dir=$2
 
 . cmd.sh
-:<<"END"
-END
 if [ $# -eq 3 ]; then
     gen_dir=$3
     python3 forward.py --data_dir $data_dir --si_dir $model_dir --sa_dir $gen_dir

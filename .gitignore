@@ -10,3 +10,5 @@ sharedfile
 *.log
 *.zip
 *.ark
+test*
+converted*

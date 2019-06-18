@@ -20,6 +20,9 @@ def nllloss(pred, true):
 def klloss(pred, true):
     return F.kl_div(pred, true)
 
+def bcloss(pred, true):
+    return F.binary_cross_entropy(pred, true)
+
 def lsadvloss(gen, true):
     """
     In discriminator case, arg should be reversed
